@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Effectio.Tests/Effectio.Tests.csproj" />
+  <Project Path="Effectio/Effectio.csproj" />
+</Solution>
