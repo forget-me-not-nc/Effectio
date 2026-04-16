@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Effectio.Common.Logging;
+using Effectio.Effects.Actions;
 using Effectio.Entities;
-using Effectio.Modifiers;
 using Effectio.Statuses;
 
 namespace Effectio.Effects
@@ -192,78 +192,24 @@ namespace Effectio.Effects
 
         private void ExecuteAction(IEffectioEntity entity, IEffect effect)
         {
-            switch (effect.ActionType)
+            var ctx = new EffectActionContext
             {
-                case EffectActionType.AdjustStat:
-                    if (entity.HasStat(effect.TargetKey))
-                    {
-                        var stat = entity.GetStat(effect.TargetKey);
-                        stat.BaseValue += effect.Value;
-                        stat.Recalculate();
-                    }
-                    break;
-
-                case EffectActionType.ApplyModifier:
-                    if (entity.HasStat(effect.TargetKey))
-                    {
-                        var stat = entity.GetStat(effect.TargetKey);
-                        var modifier = new AdditiveModifier(
-                            effect.Key + "_mod",
-                            effect.Value,
-                            effect.Duration,
-                            effect.Key
-                        );
-                        stat.AddModifier(modifier);
-                    }
-                    break;
-
-                case EffectActionType.RemoveModifier:
-                    if (entity.HasStat(effect.TargetKey))
-                    {
-                        var stat = entity.GetStat(effect.TargetKey);
-                        stat.RemoveModifier(effect.TargetKey);
-                    }
-                    break;
-
-                case EffectActionType.ApplyStatus:
-                    _statusEngine.ApplyStatus(entity, effect.TargetKey);
-                    break;
-
-                case EffectActionType.RemoveStatus:
-                    _statusEngine.RemoveStatus(entity, effect.TargetKey);
-                    break;
-
-                case EffectActionType.Custom:
-                    // Custom actions are handled via events — game code listens to OnEffectApplied/OnEffectTick
-                    break;
-            }
+                Entity = entity,
+                Effect = effect,
+                StatusEngine = _statusEngine
+            };
+            effect.Action.Execute(in ctx);
         }
 
         private void UndoAction(IEffectioEntity entity, IEffect effect)
         {
-            switch (effect.ActionType)
+            var ctx = new EffectActionContext
             {
-                case EffectActionType.AdjustStat:
-                    if (entity.HasStat(effect.TargetKey))
-                    {
-                        var stat = entity.GetStat(effect.TargetKey);
-                        stat.BaseValue -= effect.Value;
-                        stat.Recalculate();
-                    }
-                    break;
-
-                case EffectActionType.ApplyModifier:
-                    if (entity.HasStat(effect.TargetKey))
-                    {
-                        var stat = entity.GetStat(effect.TargetKey);
-                        stat.RemoveModifiersFromSource(effect.Key);
-                    }
-                    break;
-
-                case EffectActionType.ApplyStatus:
-                    _statusEngine.RemoveStatus(entity, effect.TargetKey);
-                    break;
-            }
+                Entity = entity,
+                Effect = effect,
+                StatusEngine = _statusEngine
+            };
+            effect.Action.Undo(in ctx);
         }
 
         internal bool HasActiveEffects(string entityId)

@@ -106,6 +106,35 @@ EffectBuilder.Create("LastStand")
     .Build();
 ```
 
+### Custom actions
+
+The built-in action kinds (`AdjustStat`, `ApplyModifier`, `ApplyStatus`, …) cover the common cases. For bespoke gameplay effects, implement `IEffectAction` and hand it to the builder:
+
+```csharp
+public sealed class LifestealAction : IEffectAction
+{
+    private readonly string _hp;
+    private readonly float _percent;
+    public LifestealAction(string healthStat, float percent) { _hp = healthStat; _percent = percent; }
+
+    public void Execute(in EffectActionContext ctx)
+    {
+        var hp = ctx.Entity.GetStat(_hp);
+        hp.BaseValue += hp.CurrentValue * _percent;
+        hp.Recalculate();
+    }
+
+    public void Undo(in EffectActionContext ctx) { /* not applicable */ }
+}
+
+var lifesteal = EffectBuilder.Create("Lifesteal")
+    .Timed(5f)
+    .WithAction(new LifestealAction("Health", 0.05f))
+    .Build();
+```
+
+Aura / Timed effects call `Undo` automatically on expiration or manual removal.
+
 ## Statuses
 
 Statuses are tagged conditions with optional duration, stacking, and lifecycle effects:

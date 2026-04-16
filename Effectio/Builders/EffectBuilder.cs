@@ -1,4 +1,5 @@
 using Effectio.Effects;
+using Effectio.Effects.Actions;
 
 namespace Effectio.Builders
 {
@@ -18,6 +19,7 @@ namespace Effectio.Builders
         private TriggerConditionType _triggerCondition = TriggerConditionType.None;
         private string _triggerKey;
         private float _triggerThreshold;
+        private IEffectAction _customAction;
 
         public EffectBuilder(string key)
         {
@@ -81,6 +83,18 @@ namespace Effectio.Builders
         {
             _actionType = EffectActionType.Custom;
             _customActionKey = customActionKey;
+            _customAction = null;
+            return this;
+        }
+
+        /// <summary>
+        /// Use a user-supplied <see cref="IEffectAction"/> - bypasses the built-in action kinds
+        /// and is the preferred way to plug in custom gameplay behaviour.
+        /// </summary>
+        public EffectBuilder WithAction(IEffectAction action)
+        {
+            _customAction = action;
+            _actionType = EffectActionType.Custom;
             return this;
         }
 
@@ -115,17 +129,33 @@ namespace Effectio.Builders
             return this;
         }
 
-        public IEffect Build() => new Effect(
-            _key,
-            _effectType,
-            _actionType,
-            _targetKey,
-            _value,
-            _duration,
-            _tickInterval,
-            _customActionKey,
-            _triggerCondition,
-            _triggerKey,
-            _triggerThreshold);
+        public IEffect Build()
+        {
+            if (_customAction != null)
+            {
+                return new Effect(
+                    _key,
+                    _effectType,
+                    _customAction,
+                    _duration,
+                    _tickInterval,
+                    _triggerCondition,
+                    _triggerKey,
+                    _triggerThreshold);
+            }
+
+            return new Effect(
+                _key,
+                _effectType,
+                _actionType,
+                _targetKey,
+                _value,
+                _duration,
+                _tickInterval,
+                _customActionKey,
+                _triggerCondition,
+                _triggerKey,
+                _triggerThreshold);
+        }
     }
 }

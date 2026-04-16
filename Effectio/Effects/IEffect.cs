@@ -1,3 +1,5 @@
+using Effectio.Effects.Actions;
+
 namespace Effectio.Effects
 {
     public enum EffectType
@@ -43,5 +45,13 @@ namespace Effectio.Effects
         TriggerConditionType TriggerCondition { get; }
         string TriggerKey { get; }
         float TriggerThreshold { get; }
+
+        /// <summary>
+        /// The polymorphic action executed on apply / tick and reversed on aura removal.
+        /// Populated by <see cref="Effect"/>'s constructor from the legacy action-type parameters,
+        /// or supplied directly via the custom-action constructor / <c>EffectBuilder.WithAction</c>.
+        /// </summary>
+        IEffectAction Action { get; }
     }
 }
+
