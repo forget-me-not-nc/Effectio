@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Effectio.Common.Logging;
 using Effectio.Effects.Actions;
+using Effectio.Effects.Triggers;
 using Effectio.Entities;
 using Effectio.Statuses;
 
@@ -167,27 +168,8 @@ namespace Effectio.Effects
 
         private bool CheckTriggerCondition(IEffectioEntity entity, IEffect effect)
         {
-            switch (effect.TriggerCondition)
-            {
-                case TriggerConditionType.StatBelow:
-                    if (entity.TryGetStat(effect.TriggerKey, out var statBelow))
-                        return statBelow.CurrentValue < effect.TriggerThreshold;
-                    return false;
-
-                case TriggerConditionType.StatAbove:
-                    if (entity.TryGetStat(effect.TriggerKey, out var statAbove))
-                        return statAbove.CurrentValue > effect.TriggerThreshold;
-                    return false;
-
-                case TriggerConditionType.HasStatus:
-                    return entity.HasStatus(effect.TriggerKey);
-
-                case TriggerConditionType.LacksStatus:
-                    return !entity.HasStatus(effect.TriggerKey);
-
-                default:
-                    return false;
-            }
+            var ctx = new TriggerContext { Entity = entity };
+            return effect.Trigger.IsSatisfied(in ctx);
         }
 
         private void ExecuteAction(IEffectioEntity entity, IEffect effect)

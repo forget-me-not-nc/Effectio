@@ -1,5 +1,6 @@
 using Effectio.Effects;
 using Effectio.Effects.Actions;
+using Effectio.Effects.Triggers;
 using Effectio.Modifiers;
 using System;
 
@@ -22,6 +23,7 @@ namespace Effectio.Builders
         private string _triggerKey;
         private float _triggerThreshold;
         private IEffectAction _customAction;
+        private ITriggerCondition _customTrigger;
 
         public EffectBuilder(string key)
         {
@@ -122,6 +124,7 @@ namespace Effectio.Builders
             _triggerCondition = TriggerConditionType.StatBelow;
             _triggerKey = statKey;
             _triggerThreshold = threshold;
+            _customTrigger = null;
             return this;
         }
 
@@ -130,6 +133,7 @@ namespace Effectio.Builders
             _triggerCondition = TriggerConditionType.StatAbove;
             _triggerKey = statKey;
             _triggerThreshold = threshold;
+            _customTrigger = null;
             return this;
         }
 
@@ -137,6 +141,7 @@ namespace Effectio.Builders
         {
             _triggerCondition = TriggerConditionType.HasStatus;
             _triggerKey = statusKey;
+            _customTrigger = null;
             return this;
         }
 
@@ -144,6 +149,14 @@ namespace Effectio.Builders
         {
             _triggerCondition = TriggerConditionType.LacksStatus;
             _triggerKey = statusKey;
+            _customTrigger = null;
+            return this;
+        }
+
+        /// <summary>Use a user-supplied <see cref="ITriggerCondition"/> (e.g. <c>AndTrigger</c>, custom predicate).</summary>
+        public EffectBuilder When(ITriggerCondition trigger)
+        {
+            _customTrigger = trigger;
             return this;
         }
 
@@ -159,7 +172,8 @@ namespace Effectio.Builders
                     _tickInterval,
                     _triggerCondition,
                     _triggerKey,
-                    _triggerThreshold);
+                    _triggerThreshold,
+                    _customTrigger);
             }
 
             return new Effect(
@@ -173,7 +187,8 @@ namespace Effectio.Builders
                 _customActionKey,
                 _triggerCondition,
                 _triggerKey,
-                _triggerThreshold);
+                _triggerThreshold,
+                _customTrigger);
         }
     }
 }

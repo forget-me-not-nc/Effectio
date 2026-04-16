@@ -1,4 +1,5 @@
 using Effectio.Effects.Actions;
+using Effectio.Effects.Triggers;
 
 namespace Effectio.Effects
 {
@@ -52,6 +53,12 @@ namespace Effectio.Effects
         /// or supplied directly via the custom-action constructor / <c>EffectBuilder.WithAction</c>.
         /// </summary>
         IEffectAction Action { get; }
+
+        /// <summary>
+        /// Predicate checked each tick for <see cref="EffectType.Triggered"/> effects.
+        /// Never <c>null</c> — defaults to <see cref="NeverTrigger.Instance"/> when no trigger is configured.
+        /// </summary>
+        ITriggerCondition Trigger { get; }
     }
 }
 

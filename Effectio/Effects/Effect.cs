@@ -1,5 +1,6 @@
 using System;
 using Effectio.Effects.Actions;
+using Effectio.Effects.Triggers;
 
 namespace Effectio.Effects
 {
@@ -17,6 +18,7 @@ namespace Effectio.Effects
         public string TriggerKey { get; }
         public float TriggerThreshold { get; }
         public IEffectAction Action { get; }
+        public ITriggerCondition Trigger { get; }
 
         /// <summary>
         /// Legacy-shape constructor. The engine dispatches through <see cref="Action"/>;
@@ -34,7 +36,8 @@ namespace Effectio.Effects
             string customActionKey = null,
             TriggerConditionType triggerCondition = TriggerConditionType.None,
             string triggerKey = null,
-            float triggerThreshold = 0f)
+            float triggerThreshold = 0f,
+            ITriggerCondition trigger = null)
         {
             Key = key;
             EffectType = effectType;
@@ -48,6 +51,7 @@ namespace Effectio.Effects
             TriggerKey = triggerKey;
             TriggerThreshold = triggerThreshold;
             Action = CreateBuiltInAction(actionType, targetKey, value, customActionKey);
+            Trigger = trigger ?? CreateBuiltInTrigger(triggerCondition, triggerKey, triggerThreshold);
         }
 
         /// <summary>
@@ -62,7 +66,8 @@ namespace Effectio.Effects
             float tickInterval = 0f,
             TriggerConditionType triggerCondition = TriggerConditionType.None,
             string triggerKey = null,
-            float triggerThreshold = 0f)
+            float triggerThreshold = 0f,
+            ITriggerCondition trigger = null)
         {
             if (action == null) throw new ArgumentNullException(nameof(action));
             Key = key;
@@ -77,6 +82,7 @@ namespace Effectio.Effects
             TriggerKey = triggerKey;
             TriggerThreshold = triggerThreshold;
             Action = action;
+            Trigger = trigger ?? CreateBuiltInTrigger(triggerCondition, triggerKey, triggerThreshold);
         }
 
         private static IEffectAction CreateBuiltInAction(
@@ -91,6 +97,20 @@ namespace Effectio.Effects
                 case EffectActionType.RemoveStatus:   return new RemoveStatusAction(targetKey);
                 case EffectActionType.Custom:         return new CustomAction(customActionKey);
                 default:                              return new CustomAction(customActionKey);
+            }
+        }
+
+        private static ITriggerCondition CreateBuiltInTrigger(
+            TriggerConditionType kind, string triggerKey, float threshold)
+        {
+            switch (kind)
+            {
+                case TriggerConditionType.StatBelow:    return new StatBelowTrigger(triggerKey, threshold);
+                case TriggerConditionType.StatAbove:    return new StatAboveTrigger(triggerKey, threshold);
+                case TriggerConditionType.HasStatus:    return new HasStatusTrigger(triggerKey);
+                case TriggerConditionType.LacksStatus:  return new LacksStatusTrigger(triggerKey);
+                case TriggerConditionType.None:
+                default:                                return NeverTrigger.Instance;
             }
         }
     }
