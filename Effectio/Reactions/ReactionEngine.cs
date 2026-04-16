@@ -165,28 +165,14 @@ namespace Effectio.Reactions
 
         private void ExecuteResult(IEffectioEntity entity, IReactionResult result)
         {
-            switch (result.Type)
+            var ctx = new ReactionResultContext
             {
-                case ReactionResultType.ApplyStatus:
-                    _statusEngine.ApplyStatus(entity, result.TargetKey);
-                    break;
-
-                case ReactionResultType.RemoveStatus:
-                    _statusEngine.RemoveStatus(entity, result.TargetKey);
-                    break;
-
-                case ReactionResultType.AdjustStat:
-                    OnAdjustStat?.Invoke(entity, result.TargetKey, result.Value);
-                    break;
-
-                case ReactionResultType.ApplyEffect:
-                    OnApplyEffect?.Invoke(entity, result.TargetKey);
-                    break;
-
-                case ReactionResultType.Custom:
-                    // Custom results handled via OnReactionTriggered event — game code inspects the reaction
-                    break;
-            }
+                Entity = entity,
+                StatusEngine = _statusEngine,
+                AdjustStat = OnAdjustStat,
+                ApplyEffect = OnApplyEffect
+            };
+            result.Execute(in ctx);
         }
     }
 }

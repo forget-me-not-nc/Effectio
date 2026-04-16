@@ -68,6 +68,13 @@ namespace Effectio.Builders
             return this;
         }
 
+        /// <summary>Adds a user-supplied <see cref="IReactionResult"/>.</summary>
+        public ReactionBuilder WithResult(IReactionResult result)
+        {
+            if (result != null) _results.Add(result);
+            return this;
+        }
+
         public IReaction Build() => new Reaction(
             _key,
             _requiredStatusKeys.ToArray(),
