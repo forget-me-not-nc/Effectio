@@ -10,6 +10,9 @@ namespace Effectio.Effects
         public float Duration { get; }
         public float TickInterval { get; }
         public string CustomActionKey { get; }
+        public TriggerConditionType TriggerCondition { get; }
+        public string TriggerKey { get; }
+        public float TriggerThreshold { get; }
 
         public Effect(
             string key,
@@ -19,7 +22,10 @@ namespace Effectio.Effects
             float value = 0f,
             float duration = -1f,
             float tickInterval = 0f,
-            string customActionKey = null)
+            string customActionKey = null,
+            TriggerConditionType triggerCondition = TriggerConditionType.None,
+            string triggerKey = null,
+            float triggerThreshold = 0f)
         {
             Key = key;
             EffectType = effectType;
@@ -29,6 +35,9 @@ namespace Effectio.Effects
             Duration = duration;
             TickInterval = tickInterval;
             CustomActionKey = customActionKey;
+            TriggerCondition = triggerCondition;
+            TriggerKey = triggerKey;
+            TriggerThreshold = triggerThreshold;
         }
     }
 }

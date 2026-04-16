@@ -60,6 +60,24 @@ namespace Effectio.Stats
             Recalculate();
         }
 
+        public bool TickModifiers(float deltaTime)
+        {
+            bool anyExpired = false;
+            foreach (var mod in _modifiers)
+            {
+                if (mod.Duration >= 0)
+                    mod.RemainingTime -= deltaTime;
+            }
+
+            int removed = _modifiers.RemoveAll(m => m.IsExpired);
+            if (removed > 0)
+            {
+                anyExpired = true;
+                Recalculate();
+            }
+            return anyExpired;
+        }
+
         public void Recalculate()
         {
             float value = BaseValue;

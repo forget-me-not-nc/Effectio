@@ -17,6 +17,7 @@ namespace Effectio.Stats
         void RemoveModifier(string modifierKey);
         void RemoveModifiersFromSource(string sourceKey);
         void Recalculate();
+        bool TickModifiers(float deltaTime);
 
         event Action<IStat, float, float> OnValueChanged;
     }

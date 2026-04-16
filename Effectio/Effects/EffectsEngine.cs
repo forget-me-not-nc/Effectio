@@ -46,8 +46,11 @@ namespace Effectio.Effects
             var active = new ActiveEffect(effect);
             effects.Add(active);
 
-            // For non-periodic effects, apply immediately on attach
-            if (effect.EffectType != EffectType.Periodic)
+            // Aura: apply immediately (will be undone on removal)
+            // Timed: apply immediately
+            // Periodic: wait for first tick
+            // Triggered: wait for condition
+            if (effect.EffectType == EffectType.Aura || effect.EffectType == EffectType.Timed)
             {
                 ExecuteAction(entity, effect);
             }
@@ -61,82 +64,129 @@ namespace Effectio.Effects
             if (!_activeEffects.TryGetValue(entity.Id, out var effects))
                 return;
 
-            var removed = effects.RemoveAll(e => e.Effect.Key == effectKey);
-            if (removed > 0)
+            for (int i = effects.Count - 1; i >= 0; i--)
             {
-                OnEffectRemoved?.Invoke(entity, null);
-                _logger.Info($"Effect '{effectKey}' removed from entity '{entity.Id}'.");
+                if (effects[i].Effect.Key == effectKey)
+                {
+                    var effect = effects[i].Effect;
+
+                    // Aura effects undo their action on removal
+                    if (effect.EffectType == EffectType.Aura)
+                        UndoAction(entity, effect);
+
+                    effects.RemoveAt(i);
+                    OnEffectRemoved?.Invoke(entity, effect);
+                    _logger.Info($"Effect '{effectKey}' removed from entity '{entity.Id}'.");
+                }
             }
         }
 
         public void Tick(float deltaTime)
         {
-            var entitiesToClean = new List<string>();
-
+            // Only decrement durations and mark pending work here.
+            // Actual action execution and removal is deferred to ProcessPendingTicks
+            // where the entity reference is available (needed to undo Aura effects
+            // and invoke OnEffectRemoved with a valid entity).
             foreach (var kvp in _activeEffects)
             {
-                var entityId = kvp.Key;
-                var effects = kvp.Value;
-                var toRemove = new List<ActiveEffect>();
-
-                foreach (var active in effects)
+                foreach (var active in kvp.Value)
                 {
                     var effect = active.Effect;
 
-                    // Decrement duration for timed/periodic effects
                     if (effect.Duration >= 0)
                     {
                         active.RemainingDuration -= deltaTime;
                         if (active.RemainingDuration <= 0)
                         {
-                            toRemove.Add(active);
+                            active.PendingRemoval = true;
                             continue;
                         }
                     }
 
-                    // Process periodic tick
                     if (effect.EffectType == EffectType.Periodic && effect.TickInterval > 0)
                     {
                         active.TimeSinceLastTick += deltaTime;
                         if (active.TimeSinceLastTick >= effect.TickInterval)
                         {
                             active.TimeSinceLastTick -= effect.TickInterval;
-                            // We need the entity to execute action — store entityId for lookup
                             active.PendingTick = true;
                         }
                     }
                 }
-
-                foreach (var removed in toRemove)
-                {
-                    effects.Remove(removed);
-                    OnEffectRemoved?.Invoke(null, removed.Effect);
-                }
-
-                if (effects.Count == 0)
-                    entitiesToClean.Add(entityId);
             }
-
-            foreach (var id in entitiesToClean)
-                _activeEffects.Remove(id);
         }
 
         /// <summary>
-        /// Process pending periodic ticks for a specific entity. Called by EffectioManager which has entity references.
+        /// Process pending periodic ticks, trigger checks, and removals for a specific entity.
+        /// Called by EffectioManager which has entity references.
         /// </summary>
         internal void ProcessPendingTicks(IEffectioEntity entity)
         {
             if (!_activeEffects.TryGetValue(entity.Id, out var effects))
                 return;
 
-            foreach (var active in effects)
+            for (int i = effects.Count - 1; i >= 0; i--)
             {
+                var active = effects[i];
+
+                // Handle expirations (Aura effects must undo their action).
+                if (active.PendingRemoval)
+                {
+                    if (active.Effect.EffectType == EffectType.Aura)
+                        UndoAction(entity, active.Effect);
+
+                    effects.RemoveAt(i);
+                    OnEffectRemoved?.Invoke(entity, active.Effect);
+                    _logger.Info($"Effect '{active.Effect.Key}' expired on entity '{entity.Id}'.");
+                    continue;
+                }
+
+                // Handle periodic ticks.
                 if (active.PendingTick)
                 {
                     active.PendingTick = false;
                     ExecuteAction(entity, active.Effect);
                     OnEffectTick?.Invoke(entity, active.Effect);
                 }
+
+                // Handle triggered effects — check condition each tick.
+                if (active.Effect.EffectType == EffectType.Triggered && !active.HasTriggered)
+                {
+                    if (CheckTriggerCondition(entity, active.Effect))
+                    {
+                        active.HasTriggered = true;
+                        ExecuteAction(entity, active.Effect);
+                        OnEffectTick?.Invoke(entity, active.Effect);
+                    }
+                }
+            }
+
+            if (effects.Count == 0)
+                _activeEffects.Remove(entity.Id);
+        }
+
+        private bool CheckTriggerCondition(IEffectioEntity entity, IEffect effect)
+        {
+            switch (effect.TriggerCondition)
+            {
+                case TriggerConditionType.StatBelow:
+                    if (entity.TryGetStat(effect.TriggerKey, out var statBelow))
+                        return statBelow.CurrentValue < effect.TriggerThreshold;
+                    return false;
+
+                case TriggerConditionType.StatAbove:
+                    if (entity.TryGetStat(effect.TriggerKey, out var statAbove))
+                        return statAbove.CurrentValue > effect.TriggerThreshold;
+                    return false;
+
+                case TriggerConditionType.HasStatus:
+                    return entity.HasStatus(effect.TriggerKey);
+
+                case TriggerConditionType.LacksStatus:
+                    return !entity.HasStatus(effect.TriggerKey);
+
+                default:
+                    return false;
             }
         }
 
@@ -190,6 +240,33 @@ namespace Effectio.Effects
             }
         }
 
+        private void UndoAction(IEffectioEntity entity, IEffect effect)
+        {
+            switch (effect.ActionType)
+            {
+                case EffectActionType.AdjustStat:
+                    if (entity.HasStat(effect.TargetKey))
+                    {
+                        var stat = entity.GetStat(effect.TargetKey);
+                        stat.BaseValue -= effect.Value;
+                        stat.Recalculate();
+                    }
+                    break;
+
+                case EffectActionType.ApplyModifier:
+                    if (entity.HasStat(effect.TargetKey))
+                    {
+                        var stat = entity.GetStat(effect.TargetKey);
+                        stat.RemoveModifiersFromSource(effect.Key);
+                    }
+                    break;
+
+                case EffectActionType.ApplyStatus:
+                    _statusEngine.RemoveStatus(entity, effect.TargetKey);
+                    break;
+            }
+        }
+
         internal bool HasActiveEffects(string entityId)
         {
             return _activeEffects.ContainsKey(entityId) && _activeEffects[entityId].Count > 0;
@@ -206,6 +283,8 @@ namespace Effectio.Effects
             public float RemainingDuration { get; set; }
             public float TimeSinceLastTick { get; set; }
             public bool PendingTick { get; set; }
+            public bool PendingRemoval { get; set; }
+            public bool HasTriggered { get; set; }
 
             public ActiveEffect(IEffect effect)
             {
@@ -213,6 +292,8 @@ namespace Effectio.Effects
                 RemainingDuration = effect.Duration;
                 TimeSinceLastTick = 0f;
                 PendingTick = false;
+                PendingRemoval = false;
+                HasTriggered = false;
             }
         }
     }

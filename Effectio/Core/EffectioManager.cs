@@ -92,6 +92,13 @@ namespace Effectio.Core
             {
                 var entity = kvp.Value;
 
+                // Tick modifiers on all stats (decrement duration, remove expired)
+                foreach (var statKey in entity.StatKeys)
+                {
+                    if (entity.TryGetStat(statKey, out var stat))
+                        stat.TickModifiers(deltaTime);
+                }
+
                 // Process pending effect ticks
                 _effectsEngine.ProcessPendingTicks(entity);
 

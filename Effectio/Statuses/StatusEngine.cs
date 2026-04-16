@@ -16,9 +16,14 @@ namespace Effectio.Statuses
         private readonly Dictionary<string, Dictionary<string, ActiveStatusData>> _activeStatuses =
             new Dictionary<string, Dictionary<string, ActiveStatusData>>();
 
+        // Immunities per entity: entityId -> set of immune status keys
+        private readonly Dictionary<string, HashSet<string>> _immunities =
+            new Dictionary<string, HashSet<string>>();
+
         public event Action<IEffectioEntity, string> OnStatusApplied;
         public event Action<IEffectioEntity, string> OnStatusRemoved;
         public event Action<IEffectioEntity, string> OnStatusExpired;
+        public event Action<IEffectioEntity, string> OnStatusBlocked;
 
         public StatusEngine(IEffectioLogger logger = null)
         {
@@ -36,8 +41,38 @@ namespace Effectio.Statuses
             return status;
         }
 
+        public void GrantImmunity(IEffectioEntity entity, string statusKey)
+        {
+            if (!_immunities.TryGetValue(entity.Id, out var set))
+            {
+                set = new HashSet<string>();
+                _immunities[entity.Id] = set;
+            }
+            set.Add(statusKey);
+            _logger.Info($"Entity '{entity.Id}' granted immunity to '{statusKey}'.");
+        }
+
+        public void RevokeImmunity(IEffectioEntity entity, string statusKey)
+        {
+            if (_immunities.TryGetValue(entity.Id, out var set))
+                set.Remove(statusKey);
+        }
+
+        public bool IsImmune(IEffectioEntity entity, string statusKey)
+        {
+            return _immunities.TryGetValue(entity.Id, out var set) && set.Contains(statusKey);
+        }
+
         public void ApplyStatus(IEffectioEntity entity, string statusKey)
         {
+            // Check immunity
+            if (IsImmune(entity, statusKey))
+            {
+                _logger.Info($"Status '{statusKey}' blocked on entity '{entity.Id}' (immune).");
+                OnStatusBlocked?.Invoke(entity, statusKey);
+                return;
+            }
+
             if (!_statusDefinitions.TryGetValue(statusKey, out var definition))
             {
                 _logger.Warning($"Status '{statusKey}' is not registered. Applying as a simple tag.");
@@ -193,6 +228,7 @@ namespace Effectio.Statuses
         internal void CleanupEntity(string entityId)
         {
             _activeStatuses.Remove(entityId);
+            _immunities.Remove(entityId);
         }
 
         private class ActiveStatusData

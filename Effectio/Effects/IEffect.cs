@@ -19,6 +19,15 @@ namespace Effectio.Effects
         Custom
     }
 
+    public enum TriggerConditionType
+    {
+        None,
+        StatBelow,
+        StatAbove,
+        HasStatus,
+        LacksStatus
+    }
+
     public interface IEffect
     {
         string Key { get; }
@@ -29,5 +38,10 @@ namespace Effectio.Effects
         float Duration { get; }
         float TickInterval { get; }
         string CustomActionKey { get; }
+
+        // Triggered effect support
+        TriggerConditionType TriggerCondition { get; }
+        string TriggerKey { get; }
+        float TriggerThreshold { get; }
     }
 }
