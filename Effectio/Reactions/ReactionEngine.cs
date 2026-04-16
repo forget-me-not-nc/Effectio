@@ -35,6 +35,15 @@ namespace Effectio.Reactions
             _logger = logger ?? VoidLogger.Instance;
         }
 
+        // Pooled buffers reused across CheckReactions calls.
+        // The engine is single-threaded by design (driven from Tick) and the manager guards
+        // against re-entrancy via _isCheckingReactions, so these buffers are safe to reuse.
+        private readonly List<IReaction> _matchBuffer = new List<IReaction>();
+        private readonly HashSet<string> _toRemoveBuffer = new HashSet<string>();
+        private readonly HashSet<string> _prevStatusBuffer = new HashSet<string>();
+        private readonly HashSet<string> _newStatusBuffer = new HashSet<string>();
+        private readonly HashSet<string> _entityTagsBuffer = new HashSet<string>();
+
         public void RegisterReaction(IReaction reaction)
         {
             _reactions.Add(reaction);
@@ -56,41 +65,44 @@ namespace Effectio.Reactions
                 if (triggered.Count == 0)
                     break;
 
-                // Collect all statuses to consume (after all reactions in this pass)
-                var statusesToRemove = new HashSet<string>();
-                // Collect all new statuses to add (for chain detection)
-                var previousStatuses = new HashSet<string>(entity.ActiveStatusKeys);
+                // Snapshot current statuses (pooled buffer) so we can detect new ones after the pass.
+                _prevStatusBuffer.Clear();
+                foreach (var s in entity.ActiveStatusKeys)
+                    _prevStatusBuffer.Add(s);
+
+                _toRemoveBuffer.Clear();
 
                 // Execute ALL matching reactions simultaneously
-                foreach (var reaction in triggered)
+                for (int i = 0; i < triggered.Count; i++)
                 {
+                    var reaction = triggered[i];
                     _logger.Info($"Reaction '{reaction.Key}' triggered on entity '{entity.Id}'.");
 
-                    foreach (var result in reaction.Results)
-                    {
-                        ExecuteResult(entity, result);
-                    }
+                    var results = reaction.Results;
+                    for (int r = 0; r < results.Length; r++)
+                        ExecuteResult(entity, results[r]);
 
                     if (reaction.ConsumesStatuses)
                     {
-                        foreach (var key in reaction.RequiredStatusKeys)
-                            statusesToRemove.Add(key);
+                        var keys = reaction.RequiredStatusKeys;
+                        for (int k = 0; k < keys.Length; k++)
+                            _toRemoveBuffer.Add(keys[k]);
                     }
 
                     OnReactionTriggered?.Invoke(entity, reaction);
                 }
 
                 // Remove consumed statuses after all reactions in this pass
-                foreach (var statusKey in statusesToRemove)
-                {
+                foreach (var statusKey in _toRemoveBuffer)
                     _statusEngine.RemoveStatus(entity, statusKey);
-                }
 
-                // Check if new statuses were added (for chaining)
-                var currentStatuses = new HashSet<string>(entity.ActiveStatusKeys);
-                currentStatuses.ExceptWith(previousStatuses);
+                // Detect new statuses for chain detection
+                _newStatusBuffer.Clear();
+                foreach (var s in entity.ActiveStatusKeys)
+                    if (!_prevStatusBuffer.Contains(s))
+                        _newStatusBuffer.Add(s);
 
-                if (currentStatuses.Count == 0)
+                if (_newStatusBuffer.Count == 0)
                     break; // No new statuses — no further chaining possible
 
                 depth++;
@@ -104,15 +116,14 @@ namespace Effectio.Reactions
 
         private List<IReaction> FindMatchingReactions(IEffectioEntity entity)
         {
-            var matches = new List<IReaction>();
-
-            foreach (var reaction in _reactions)
+            _matchBuffer.Clear();
+            for (int i = 0; i < _reactions.Count; i++)
             {
+                var reaction = _reactions[i];
                 if (IsReactionSatisfied(entity, reaction))
-                    matches.Add(reaction);
+                    _matchBuffer.Add(reaction);
             }
-
-            return matches;
+            return _matchBuffer;
         }
 
         private bool IsReactionSatisfied(IEffectioEntity entity, IReaction reaction)
@@ -143,21 +154,23 @@ namespace Effectio.Reactions
 
         private bool AreTagsSatisfied(IEffectioEntity entity, string[] requiredTags)
         {
-            // Each required tag must be present on at least one active status
-            var entityTags = new HashSet<string>();
+            // Each required tag must be present on at least one active status.
+            // Reuses the pooled tag buffer to avoid per-check allocation.
+            _entityTagsBuffer.Clear();
             foreach (var statusKey in entity.ActiveStatusKeys)
             {
                 var definition = _statusEngine.GetStatusDefinition(statusKey);
                 if (definition?.Tags != null)
                 {
-                    foreach (var tag in definition.Tags)
-                        entityTags.Add(tag);
+                    var tags = definition.Tags;
+                    for (int i = 0; i < tags.Length; i++)
+                        _entityTagsBuffer.Add(tags[i]);
                 }
             }
 
-            foreach (var tag in requiredTags)
+            for (int i = 0; i < requiredTags.Length; i++)
             {
-                if (!entityTags.Contains(tag))
+                if (!_entityTagsBuffer.Contains(requiredTags[i]))
                     return false;
             }
             return true;

@@ -2,9 +2,9 @@
 
 A Unity-compatible (`netstandard2.0`) C# library for managing game entity **stats**, **modifiers**, **effects**, **statuses**, and cross-status **reactions** — the building blocks behind mechanics like damage-over-time, auras, elemental interactions (e.g. *fire + water = vaporize*), and conditional buffs.
 
-- **Lightweight** — no runtime reflection, no allocations in the tick hot path beyond what modifiers/effects themselves require.
+- **Lightweight** — no runtime reflection; the stat / effect / status / reaction engines reuse pooled buffers so `Tick` allocates only the modifier and effect instances the game itself asks to be created.
 - **Deterministic** — single `Tick(deltaTime)` entry point drives the whole simulation.
-- **Extensible** — every subsystem (stats, effects, statuses, reactions) is accessible via its own engine.
+- **Extensible** — every subsystem (stats, effects, statuses, reactions) is accessible via its own engine, and every pipeline point (modifier kinds, effect actions, effect triggers, reaction results) is an interface you can implement.
 - **Unity friendly** — targets `netstandard2.0`, no external dependencies.
 
 ---

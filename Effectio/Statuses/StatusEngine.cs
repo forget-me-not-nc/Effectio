@@ -145,7 +145,8 @@ namespace Effectio.Statuses
 
         public void Tick(float deltaTime)
         {
-            var expiredList = new List<(string entityId, string statusKey)>();
+            // Reuse the pooled buffer so Tick is allocation-free.
+            _expiredBuffer.Clear();
 
             foreach (var kvp in _activeStatuses)
             {
@@ -153,9 +154,7 @@ namespace Effectio.Statuses
                 foreach (var statusKvp in kvp.Value)
                 {
                     var data = statusKvp.Value;
-                    var definition = _statusDefinitions.ContainsKey(data.StatusKey)
-                        ? _statusDefinitions[data.StatusKey]
-                        : null;
+                    _statusDefinitions.TryGetValue(data.StatusKey, out var definition);
 
                     // Decrement duration (skip permanent statuses)
                     if (data.RemainingDuration >= 0)
@@ -163,7 +162,7 @@ namespace Effectio.Statuses
                         data.RemainingDuration -= deltaTime;
                         if (data.RemainingDuration <= 0)
                         {
-                            expiredList.Add((entityId, data.StatusKey));
+                            _expiredBuffer.Add((entityId, data.StatusKey));
                             continue;
                         }
                     }
@@ -181,44 +180,46 @@ namespace Effectio.Statuses
                 }
             }
 
-            // Process expirations (entity references resolved by manager)
-            foreach (var (entityId, statusKey) in expiredList)
+            // Remove expired entries from the active map (entity-level cleanup happens in manager).
+            for (int i = 0; i < _expiredBuffer.Count; i++)
             {
+                var (entityId, statusKey) = _expiredBuffer[i];
                 if (_activeStatuses.TryGetValue(entityId, out var entityStatuses))
-                {
                     entityStatuses.Remove(statusKey);
-                }
             }
-
-            // Store expired for manager to process with entity references
-            PendingExpirations = expiredList;
         }
 
         /// <summary>
         /// Expirations from the last Tick call, to be processed by EffectioManager which has entity references.
+        /// Manager is expected to call <c>Clear()</c> after processing — the buffer is then reused on the next Tick.
         /// </summary>
-        internal List<(string entityId, string statusKey)> PendingExpirations { get; private set; }
+        internal List<(string entityId, string statusKey)> PendingExpirations => _expiredBuffer;
+
+        private readonly List<(string entityId, string statusKey)> _expiredBuffer
             = new List<(string, string)>();
 
         /// <summary>
-        /// Get pending tick data for a specific entity.
+        /// Get pending tick data for a specific entity. The returned list is a reused buffer —
+        /// callers must iterate it before the next <c>GetPendingTicks</c> call.
         /// </summary>
         internal List<string> GetPendingTicks(string entityId)
         {
-            var result = new List<string>();
+            _pendingTicksBuffer.Clear();
             if (!_activeStatuses.TryGetValue(entityId, out var entityStatuses))
-                return result;
+                return _pendingTicksBuffer;
 
             foreach (var kvp in entityStatuses)
             {
                 if (kvp.Value.PendingTick)
                 {
                     kvp.Value.PendingTick = false;
-                    result.Add(kvp.Key);
+                    _pendingTicksBuffer.Add(kvp.Key);
                 }
             }
-            return result;
+            return _pendingTicksBuffer;
         }
+
+        private readonly List<string> _pendingTicksBuffer = new List<string>();
 
         internal void RaiseStatusExpired(IEffectioEntity entity, string statusKey)
         {
