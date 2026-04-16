@@ -1,5 +1,5 @@
+using System;
 using System.Collections.Generic;
-using Effectio.Common.Exceptions;
 using Effectio.Stats;
 
 namespace Effectio.Entities
@@ -22,7 +22,7 @@ namespace Effectio.Entities
         public void AddStat(IStat stat)
         {
             if (_stats.ContainsKey(stat.Key))
-                throw new StatException($"Stat '{stat.Key}' already exists on entity '{Id}'.", stat.Key);
+                throw new InvalidOperationException($"Stat '{stat.Key}' already exists on entity '{Id}'.");
 
             _stats[stat.Key] = stat;
         }
@@ -32,7 +32,12 @@ namespace Effectio.Entities
             if (_stats.TryGetValue(key, out var stat))
                 return stat;
 
-            throw new StatException($"Stat '{key}' not found on entity '{Id}'.", key);
+            throw new KeyNotFoundException($"Stat '{key}' not found on entity '{Id}'.");
+        }
+
+        public bool TryGetStat(string key, out IStat stat)
+        {
+            return _stats.TryGetValue(key, out stat);
         }
 
         public bool HasStat(string key) => _stats.ContainsKey(key);

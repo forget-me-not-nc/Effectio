@@ -9,6 +9,7 @@ namespace Effectio.Entities
 
         // Stats
         IStat GetStat(string key);
+        bool TryGetStat(string key, out IStat stat);
         bool HasStat(string key);
         IReadOnlyCollection<string> StatKeys { get; }
         void AddStat(IStat stat);

@@ -1,5 +1,5 @@
+using System;
 using System.Collections.Generic;
-using Effectio.Common.Exceptions;
 using Effectio.Common.Logging;
 using Effectio.Effects;
 using Effectio.Entities;
@@ -48,7 +48,7 @@ namespace Effectio.Core
         public IEffectioEntity CreateEntity(string id)
         {
             if (_entities.ContainsKey(id))
-                throw new EntityException($"Entity '{id}' already exists.", id);
+                throw new InvalidOperationException($"Entity '{id}' already exists.");
 
             var entity = new EffectioEntity(id);
             _entities[id] = entity;
@@ -61,7 +61,12 @@ namespace Effectio.Core
             if (_entities.TryGetValue(id, out var entity))
                 return entity;
 
-            throw new EntityException($"Entity '{id}' not found.", id);
+            throw new KeyNotFoundException($"Entity '{id}' not found.");
+        }
+
+        public bool TryGetEntity(string id, out IEffectioEntity entity)
+        {
+            return _entities.TryGetValue(id, out entity);
         }
 
         public void RemoveEntity(string id)

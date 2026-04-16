@@ -250,7 +250,31 @@ namespace Effectio.Tests.Integration
 
             manager.RemoveEntity("npc1");
 
-            Assert.ThrowsException<Effectio.Common.Exceptions.EntityException>(() => manager.GetEntity("npc1"));
+            // GetEntity throws for missing entities
+            Assert.ThrowsException<System.Collections.Generic.KeyNotFoundException>(() => manager.GetEntity("npc1"));
+
+            // TryGetEntity returns false instead of throwing
+            Assert.IsFalse(manager.TryGetEntity("npc1", out _));
+        }
+
+        [TestMethod]
+        public void FullPipeline_TryGetPatterns()
+        {
+            var manager = new EffectioManager();
+            var entity = manager.CreateEntity("test");
+            entity.AddStat(new Stat("Health", 100f, 0f, 500f));
+
+            // TryGetEntity succeeds
+            Assert.IsTrue(manager.TryGetEntity("test", out var found));
+            Assert.AreEqual("test", found.Id);
+
+            // TryGetStat succeeds
+            Assert.IsTrue(entity.TryGetStat("Health", out var health));
+            Assert.AreEqual(100f, health.CurrentValue);
+
+            // TryGetStat fails gracefully
+            Assert.IsFalse(entity.TryGetStat("NonExistent", out var missing));
+            Assert.IsNull(missing);
         }
     }
 }
