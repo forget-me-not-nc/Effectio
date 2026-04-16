@@ -108,7 +108,17 @@ EffectBuilder.Create("LastStand")
 
 ### Custom actions
 
-The built-in action kinds (`AdjustStat`, `ApplyModifier`, `ApplyStatus`, …) cover the common cases. For bespoke gameplay effects, implement `IEffectAction` and hand it to the builder:
+The built-in action kinds (`AdjustStat`, `ApplyModifier`, `ApplyStatus`, …) cover the common cases. `ApplyModifier` accepts any `IModifier` kind via a factory:
+
+```csharp
+// +100% damage as a multiplicative modifier for 5s
+EffectBuilder.Create("Rage")
+    .Timed(5f)
+    .ApplyModifier("Damage", e => new MultiplicativeModifier(e.Key + "_mod", 2f, e.Duration, e.Key))
+    .Build();
+```
+
+For bespoke gameplay effects, implement `IEffectAction` and hand it to the builder:
 
 ```csharp
 public sealed class LifestealAction : IEffectAction

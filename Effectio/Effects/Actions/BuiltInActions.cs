@@ -1,3 +1,4 @@
+using System;
 using Effectio.Modifiers;
 
 namespace Effectio.Effects.Actions
@@ -31,34 +32,51 @@ namespace Effectio.Effects.Actions
         }
     }
 
-    /// <summary>Attaches an <see cref="AdditiveModifier"/> with the effect's key/duration/source.</summary>
+    /// <summary>
+    /// Attaches a modifier to <see cref="TargetStatKey"/>. The modifier is produced by
+    /// <see cref="ModifierFactory"/> on each <see cref="Execute"/>, so every application
+    /// gets a fresh instance with its own <c>RemainingTime</c>. Works for any
+    /// <see cref="IModifier"/> kind — additive, multiplicative, cap-adjusting, or custom.
+    /// </summary>
     public sealed class ApplyModifierAction : IEffectAction
     {
         public string TargetStatKey { get; }
+
+        /// <summary>The nominal value for the legacy additive shortcut; <c>0</c> when constructed with a factory.</summary>
         public float Value { get; }
 
+        public Func<IEffect, IModifier> ModifierFactory { get; }
+
+        /// <summary>
+        /// Shortcut that attaches a fresh <see cref="AdditiveModifier"/> per apply, using the
+        /// effect's <c>Key + "_mod"</c>/<c>Duration</c>/<c>Key</c> for identity/duration/source.
+        /// </summary>
         public ApplyModifierAction(string targetStatKey, float value)
         {
             TargetStatKey = targetStatKey;
             Value = value;
+            ModifierFactory = e => new AdditiveModifier(e.Key + "_mod", value, e.Duration, e.Key);
+        }
+
+        /// <summary>Applies a modifier produced by <paramref name="modifierFactory"/> — any <see cref="IModifier"/> kind.</summary>
+        public ApplyModifierAction(string targetStatKey, Func<IEffect, IModifier> modifierFactory)
+        {
+            if (modifierFactory == null) throw new ArgumentNullException(nameof(modifierFactory));
+            TargetStatKey = targetStatKey;
+            Value = 0f;
+            ModifierFactory = modifierFactory;
         }
 
         public void Execute(in EffectActionContext ctx)
         {
             if (!ctx.Entity.HasStat(TargetStatKey)) return;
-            var stat = ctx.Entity.GetStat(TargetStatKey);
-            stat.AddModifier(new AdditiveModifier(
-                ctx.Effect.Key + "_mod",
-                Value,
-                ctx.Effect.Duration,
-                ctx.Effect.Key));
+            ctx.Entity.GetStat(TargetStatKey).AddModifier(ModifierFactory(ctx.Effect));
         }
 
         public void Undo(in EffectActionContext ctx)
         {
             if (!ctx.Entity.HasStat(TargetStatKey)) return;
-            var stat = ctx.Entity.GetStat(TargetStatKey);
-            stat.RemoveModifiersFromSource(ctx.Effect.Key);
+            ctx.Entity.GetStat(TargetStatKey).RemoveModifiersFromSource(ctx.Effect.Key);
         }
     }
 

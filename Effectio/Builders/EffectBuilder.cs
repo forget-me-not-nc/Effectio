@@ -1,5 +1,7 @@
 using Effectio.Effects;
 using Effectio.Effects.Actions;
+using Effectio.Modifiers;
+using System;
 
 namespace Effectio.Builders
 {
@@ -47,6 +49,7 @@ namespace Effectio.Builders
             _actionType = EffectActionType.AdjustStat;
             _targetKey = statKey;
             _value = value;
+            _customAction = null;
             return this;
         }
 
@@ -55,6 +58,18 @@ namespace Effectio.Builders
             _actionType = EffectActionType.ApplyModifier;
             _targetKey = statKey;
             _value = value;
+            _customAction = null;
+            return this;
+        }
+
+        /// <summary>
+        /// Apply any <see cref="IModifier"/> kind via a factory invoked per execution.
+        /// Use this to attach multiplicative, cap-adjustment, or custom modifiers.
+        /// </summary>
+        public EffectBuilder ApplyModifier(string statKey, Func<IEffect, IModifier> modifierFactory)
+        {
+            _customAction = new ApplyModifierAction(statKey, modifierFactory);
+            _actionType = EffectActionType.Custom;
             return this;
         }
 
@@ -62,6 +77,7 @@ namespace Effectio.Builders
         {
             _actionType = EffectActionType.RemoveModifier;
             _targetKey = modifierKey;
+            _customAction = null;
             return this;
         }
 
@@ -69,6 +85,7 @@ namespace Effectio.Builders
         {
             _actionType = EffectActionType.ApplyStatus;
             _targetKey = statusKey;
+            _customAction = null;
             return this;
         }
 
@@ -76,6 +93,7 @@ namespace Effectio.Builders
         {
             _actionType = EffectActionType.RemoveStatus;
             _targetKey = statusKey;
+            _customAction = null;
             return this;
         }
 

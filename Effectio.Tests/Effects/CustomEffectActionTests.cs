@@ -3,6 +3,7 @@ using Effectio.Builders;
 using Effectio.Core;
 using Effectio.Effects;
 using Effectio.Effects.Actions;
+using Effectio.Modifiers;
 using Effectio.Stats;
 
 namespace Effectio.Tests.Effects
@@ -87,6 +88,52 @@ namespace Effectio.Tests.Effects
             Assert.AreEqual(EffectType.Aura, effect.EffectType);
             Assert.AreEqual(EffectActionType.Custom, effect.ActionType);
             Assert.AreSame(action, effect.Action);
+        }
+
+        [TestMethod]
+        public void ApplyModifierAction_WithFactory_AttachesMultiplicativeModifier()
+        {
+            var manager = new EffectioManager();
+            var p = manager.CreateEntity("p");
+            p.AddStat(new Stat("Damage", 10f));
+
+            var effect = EffectBuilder.Create("rage")
+                .Timed(duration: 5f)
+                .ApplyModifier("Damage", e => new MultiplicativeModifier(e.Key + "_mod", 2f, e.Duration, e.Key))
+                .Build();
+
+            manager.Effects.ApplyEffect(p, effect);
+
+            Assert.AreEqual(20f, p.GetStat("Damage").CurrentValue);
+            Assert.AreEqual(1, p.GetStat("Damage").Modifiers.Count);
+            Assert.IsInstanceOfType(p.GetStat("Damage").Modifiers[0], typeof(MultiplicativeModifier));
+        }
+
+        [TestMethod]
+        public void ApplyModifierAction_WithFactory_ProducesFreshModifierPerExecute()
+        {
+            // Periodic effect: each tick should add a new modifier instance (separate RemainingTime).
+            var manager = new EffectioManager();
+            var p = manager.CreateEntity("p");
+            p.AddStat(new Stat("Damage", 10f));
+
+            int factoryCalls = 0;
+            var effect = EffectBuilder.Create("pulse")
+                .Periodic(duration: 3f, tickInterval: 1f)
+                .ApplyModifier("Damage", e =>
+                {
+                    factoryCalls++;
+                    return new AdditiveModifier(e.Key + "_mod_" + factoryCalls, 1f, 2f, e.Key);
+                })
+                .Build();
+
+            manager.Effects.ApplyEffect(p, effect);
+
+            manager.Tick(1f);
+            manager.Tick(1f);
+
+            Assert.AreEqual(2, factoryCalls);
+            Assert.AreEqual(2, p.GetStat("Damage").Modifiers.Count);
         }
     }
 }
