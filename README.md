@@ -47,21 +47,39 @@ manager.Tick(deltaTime: 0.016f);
 
 ## Stats & modifiers
 
-Stats apply their modifiers in a fixed pipeline: **Additive -> Multiplicative -> CapAdjustment -> Clamp(Min, Max)**.
+Stats apply their modifiers in a single priority-ordered pass, then clamp to `[Min, effectiveMax]`. The built-in priority bands are `Additive` (100) → `Multiplicative` (200) → `CapAdjustment` (300); custom modifiers can choose any `int` priority.
 
 ```csharp
 using Effectio.Modifiers;
+using Effectio.Builders;
 
 var dmg = player.GetStat("Damage");
 
 // +10 flat for 5 seconds, sourced from "SpellBuff"
-dmg.AddModifier(new Modifier("spell_bonus", ModifierType.Additive, 10f, duration: 5f, sourceKey: "SpellBuff"));
+dmg.AddModifier(new AdditiveModifier("spell_bonus", 10f, duration: 5f, sourceKey: "SpellBuff"));
 
-// +20% while it lasts
-dmg.AddModifier(new Modifier("rage", ModifierType.Multiplicative, 1.2f, duration: 5f, sourceKey: "SpellBuff"));
+// +20% while it lasts, via the fluent builder
+dmg.AddModifier(ModifierBuilder.Create("rage")
+    .Multiplicative(1.2f)
+    .WithDuration(5f)
+    .FromSource("SpellBuff")
+    .Build());
 
 // Remove everything from a given source
 dmg.RemoveModifiersFromSource("SpellBuff");
+```
+
+Defining a custom modifier kind is just a new subclass of `ModifierBase`:
+
+```csharp
+public sealed class OverrideModifier : ModifierBase
+{
+    private readonly float _value;
+    public override int Priority => ModifierPriority.Override; // 50 — runs before Additive
+    public OverrideModifier(string key, float value, float duration = -1f, string sourceKey = null)
+        : base(key, duration, sourceKey) => _value = value;
+    public override void Apply(ref StatCalculationContext ctx) => ctx.Value = _value;
+}
 ```
 
 Modifier durations are ticked automatically by `EffectioManager.Tick(dt)` — expired modifiers are removed and the stat recalculates.

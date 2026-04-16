@@ -33,7 +33,7 @@ namespace Effectio.Tests.Stats
         public void AdditiveModifier_IncreasesValue()
         {
             var stat = new Stat("Health", 100f, 0f, 500f);
-            var modifier = new Modifier("bonus_hp", ModifierType.Additive, 50f);
+            var modifier = new AdditiveModifier("bonus_hp", 50f);
 
             stat.AddModifier(modifier);
 
@@ -44,7 +44,7 @@ namespace Effectio.Tests.Stats
         public void MultiplicativeModifier_MultipliesValue()
         {
             var stat = new Stat("Damage", 50f, 0f, 1000f);
-            var modifier = new Modifier("dmg_mult", ModifierType.Multiplicative, 2f);
+            var modifier = new MultiplicativeModifier("dmg_mult", 2f);
 
             stat.AddModifier(modifier);
 
@@ -55,8 +55,9 @@ namespace Effectio.Tests.Stats
         public void ModifierPipeline_AdditiveBeforeMultiplicative()
         {
             var stat = new Stat("Damage", 100f, 0f, 10000f);
-            stat.AddModifier(new Modifier("flat_bonus", ModifierType.Additive, 50f));
-            stat.AddModifier(new Modifier("double", ModifierType.Multiplicative, 2f));
+            // Insert in reverse to prove sorted-insert correctness.
+            stat.AddModifier(new MultiplicativeModifier("double", 2f));
+            stat.AddModifier(new AdditiveModifier("flat_bonus", 50f));
 
             // (100 + 50) * 2 = 300
             Assert.AreEqual(300f, stat.CurrentValue);
@@ -66,8 +67,8 @@ namespace Effectio.Tests.Stats
         public void CapAdjustment_IncreasesMaximum()
         {
             var stat = new Stat("Health", 100f, 0f, 100f);
-            stat.AddModifier(new Modifier("hp_cap", ModifierType.CapAdjustment, 50f));
-            stat.AddModifier(new Modifier("flat_hp", ModifierType.Additive, 30f));
+            stat.AddModifier(new CapAdjustmentModifier("hp_cap", 50f));
+            stat.AddModifier(new AdditiveModifier("flat_hp", 30f));
 
             // 100 + 30 = 130, max is 100 + 50 = 150, so 130
             Assert.AreEqual(130f, stat.CurrentValue);
@@ -77,7 +78,7 @@ namespace Effectio.Tests.Stats
         public void RemoveModifier_RestoresValue()
         {
             var stat = new Stat("Health", 100f, 0f, 500f);
-            stat.AddModifier(new Modifier("bonus", ModifierType.Additive, 50f));
+            stat.AddModifier(new AdditiveModifier("bonus", 50f));
             Assert.AreEqual(150f, stat.CurrentValue);
 
             stat.RemoveModifier("bonus");
@@ -88,9 +89,9 @@ namespace Effectio.Tests.Stats
         public void RemoveModifiersFromSource_RemovesAllFromSource()
         {
             var stat = new Stat("Health", 100f, 0f, 500f);
-            stat.AddModifier(new Modifier("mod1", ModifierType.Additive, 20f, sourceKey: "buff_A"));
-            stat.AddModifier(new Modifier("mod2", ModifierType.Additive, 30f, sourceKey: "buff_A"));
-            stat.AddModifier(new Modifier("mod3", ModifierType.Additive, 10f, sourceKey: "buff_B"));
+            stat.AddModifier(new AdditiveModifier("mod1", 20f, sourceKey: "buff_A"));
+            stat.AddModifier(new AdditiveModifier("mod2", 30f, sourceKey: "buff_A"));
+            stat.AddModifier(new AdditiveModifier("mod3", 10f, sourceKey: "buff_B"));
 
             Assert.AreEqual(160f, stat.CurrentValue);
 
@@ -105,7 +106,7 @@ namespace Effectio.Tests.Stats
             float oldVal = 0, newVal = 0;
             stat.OnValueChanged += (s, o, n) => { oldVal = o; newVal = n; };
 
-            stat.AddModifier(new Modifier("bonus", ModifierType.Additive, 25f));
+            stat.AddModifier(new AdditiveModifier("bonus", 25f));
 
             Assert.AreEqual(100f, oldVal);
             Assert.AreEqual(125f, newVal);

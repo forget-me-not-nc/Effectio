@@ -44,7 +44,14 @@ namespace Effectio.Stats
 
         public void AddModifier(IModifier modifier)
         {
-            _modifiers.Add(modifier);
+            // Stable sorted insert by Priority — ensures Recalculate can iterate once.
+            int i = 0;
+            for (; i < _modifiers.Count; i++)
+            {
+                if (_modifiers[i].Priority > modifier.Priority)
+                    break;
+            }
+            _modifiers.Insert(i, modifier);
             Recalculate();
         }
 
@@ -80,34 +87,20 @@ namespace Effectio.Stats
 
         public void Recalculate()
         {
-            float value = BaseValue;
+            var ctx = new StatCalculationContext
+            {
+                Value = BaseValue,
+                EffectiveMin = Min,
+                EffectiveMax = Max
+            };
 
-            // Phase 1: Additive
+            // Single pass — _modifiers is kept priority-sorted in AddModifier.
             foreach (var mod in _modifiers)
             {
-                if (mod.Type == ModifierType.Additive)
-                    value += mod.Value;
+                mod.Apply(ref ctx);
             }
 
-            // Phase 2: Multiplicative
-            foreach (var mod in _modifiers)
-            {
-                if (mod.Type == ModifierType.Multiplicative)
-                    value *= mod.Value;
-            }
-
-            // Phase 3: Cap adjustments (modify min/max temporarily — applied to the value)
-            float effectiveMin = Min;
-            float effectiveMax = Max;
-            foreach (var mod in _modifiers)
-            {
-                if (mod.Type == ModifierType.CapAdjustment)
-                {
-                    effectiveMax += mod.Value;
-                }
-            }
-
-            CurrentValue = Clamp(value, effectiveMin, effectiveMax);
+            CurrentValue = Clamp(ctx.Value, ctx.EffectiveMin, ctx.EffectiveMax);
         }
 
         private float Clamp(float value)

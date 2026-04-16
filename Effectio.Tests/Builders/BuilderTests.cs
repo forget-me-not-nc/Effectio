@@ -1,6 +1,7 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Effectio.Builders;
 using Effectio.Effects;
+using Effectio.Modifiers;
 using Effectio.Reactions;
 using Effectio.Statuses;
 
@@ -87,5 +88,33 @@ namespace Effectio.Tests.Builders
             Assert.AreEqual(ReactionResultType.ApplyStatus, reaction.Results[1].Type);
             Assert.AreEqual("Stunned", reaction.Results[1].TargetKey);
         }
+
+        [TestMethod]
+        public void ModifierBuilder_BuildsAdditive()
+        {
+            var mod = ModifierBuilder.Create("buff")
+                .Additive(25f)
+                .WithDuration(3f)
+                .FromSource("spell")
+                .Build();
+
+            Assert.IsInstanceOfType(mod, typeof(AdditiveModifier));
+            Assert.AreEqual("buff", mod.Key);
+            Assert.AreEqual("spell", mod.SourceKey);
+            Assert.AreEqual(3f, mod.Duration);
+            Assert.AreEqual(ModifierPriority.Additive, mod.Priority);
+        }
+
+        [TestMethod]
+        public void ModifierBuilder_BuildsMultiplicativeAndCap()
+        {
+            var mult = ModifierBuilder.Create("m").Multiplicative(2f).Build();
+            var cap  = ModifierBuilder.Create("c").CapAdjustment(50f).Build();
+
+            Assert.IsInstanceOfType(mult, typeof(MultiplicativeModifier));
+            Assert.IsInstanceOfType(cap, typeof(CapAdjustmentModifier));
+            Assert.IsTrue(mult.Priority < cap.Priority);
+        }
     }
 }
+

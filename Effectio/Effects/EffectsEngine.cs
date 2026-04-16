@@ -207,9 +207,8 @@ namespace Effectio.Effects
                     if (entity.HasStat(effect.TargetKey))
                     {
                         var stat = entity.GetStat(effect.TargetKey);
-                        var modifier = new Modifier(
+                        var modifier = new AdditiveModifier(
                             effect.Key + "_mod",
-                            ModifierType.Additive,
                             effect.Value,
                             effect.Duration,
                             effect.Key

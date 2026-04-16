@@ -12,7 +12,7 @@ namespace Effectio.Tests.Stats
         public void TickModifiers_RemovesExpiredModifier_AndRecalculates()
         {
             var stat = new Stat("Damage", 50f);
-            stat.AddModifier(new Modifier("buff", ModifierType.Additive, 10f, duration: 2f, sourceKey: "spell"));
+            stat.AddModifier(new AdditiveModifier("buff", 10f, duration: 2f, sourceKey: "spell"));
 
             Assert.AreEqual(60f, stat.CurrentValue);
 
@@ -30,7 +30,7 @@ namespace Effectio.Tests.Stats
         public void TickModifiers_LeavesPermanentModifier()
         {
             var stat = new Stat("Damage", 50f);
-            stat.AddModifier(new Modifier("perm", ModifierType.Additive, 5f, duration: -1f, sourceKey: "gear"));
+            stat.AddModifier(new AdditiveModifier("perm", 5f, duration: -1f, sourceKey: "gear"));
 
             stat.TickModifiers(100f);
 
