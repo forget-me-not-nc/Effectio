@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Effect catalog** via the new `IEffectCatalog` interface and
+  `EffectioManager.EffectCatalog` property (`RegisterEffect(IEffect)`,
+  `TryGetEffect(string, out IEffect)`, `RegisteredEffects`). The built-in
+  `EffectsEngine` implements both `IEffectsEngine` (unchanged) and
+  `IEffectCatalog`. Roadmap task v1.1 #4.
 - **Reaction priority** via the new `IPrioritizedReaction` interface and
   `ReactionBuilder.Priority(int)`. Higher-priority reactions fire first, and
   their consumed statuses are removed before lower-priority reactions
@@ -20,11 +25,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   v1.0 external implementations) are treated as priority 0, identical to
   v1.0 behaviour.
 
+### Fixed
+
+- `ReactionBuilder.ApplyEffect(string)` (and `ReactionResult` of type
+  `ApplyEffect`) now actually apply the named effect when the reaction
+  fires. Pre-v1.1 the reaction engine's `OnApplyEffect` callback was never
+  wired by `EffectioManager`, so this result type was a silent no-op.
+  `EffectioManager` now resolves the key through `IEffectCatalog` and applies
+  the resulting effect; an unknown key is logged as a warning and skipped
+  (other results in the same reaction still execute).
+
 ### Backwards compatibility
 
-- v1.0 source and binary surfaces are preserved. `IReaction` is unchanged,
-  so existing implementations compile and load against v1.1 unmodified. The
-  v1.0 5-parameter `Reaction(...)` constructor is kept as a distinct
+- v1.0 source and binary surfaces are preserved. `IReaction`, `IEffectsEngine`
+  and `IEffectioManager` are unchanged, so existing implementations compile
+  and load against v1.1 unmodified. New surfaces (`IPrioritizedReaction`,
+  `IEffectCatalog`, `EffectioManager.EffectCatalog`) are additive.
+  The v1.0 5-parameter `Reaction(...)` constructor is kept as a distinct
   overload (it delegates to the new 6-parameter form with `priority: 0`),
   so pre-built v1.0 consumers do not hit `MissingMethodException`.
   Regression tests cover both paths.

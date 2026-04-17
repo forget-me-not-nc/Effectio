@@ -9,7 +9,7 @@ using Effectio.Statuses;
 
 namespace Effectio.Effects
 {
-    public class EffectsEngine : IEffectsEngine
+    public class EffectsEngine : IEffectsEngine, IEffectCatalog
     {
         private readonly IEffectioLogger _logger;
         private readonly IStatusEngine _statusEngine;
@@ -17,6 +17,10 @@ namespace Effectio.Effects
         // Tracks active non-instant effects per entity
         private readonly Dictionary<string, List<ActiveEffect>> _activeEffects =
             new Dictionary<string, List<ActiveEffect>>();
+
+        // v1.1: catalog of registered effect definitions, looked up by key when a
+        // reaction's ApplyEffect(string) result fires.
+        private readonly Dictionary<string, IEffect> _catalog = new Dictionary<string, IEffect>();
 
         public event Action<IEffectioEntity, IEffect> OnEffectApplied;
         public event Action<IEffectioEntity, IEffect> OnEffectRemoved;
@@ -27,6 +31,23 @@ namespace Effectio.Effects
             _statusEngine = statusEngine;
             _logger = logger ?? VoidLogger.Instance;
         }
+
+        // -------- IEffectCatalog --------
+
+        public void RegisterEffect(IEffect effect)
+        {
+            _catalog[effect.Key] = effect;
+            if (_logger.IsEnabled) _logger.Info($"Effect '{effect.Key}' registered in catalog.");
+        }
+
+        public bool TryGetEffect(string key, out IEffect effect)
+        {
+            return _catalog.TryGetValue(key, out effect);
+        }
+
+        public IReadOnlyCollection<IEffect> RegisteredEffects => _catalog.Values;
+
+        // -------- IEffectsEngine --------
 
         public void ApplyEffect(IEffectioEntity entity, IEffect effect)
         {
