@@ -47,12 +47,31 @@ namespace Effectio.Reactions
 
         public void RegisterReaction(IReaction reaction)
         {
+            // Insert at the end, then bubble up while strictly higher priority than the
+            // left neighbour. Strict (>, not >=) inequality keeps the sort *stable* for
+            // ties, preserving registration order among equal-priority reactions - which
+            // is the v1.0-equivalent "fire simultaneously" behaviour callers rely on.
+            // Reactions that do not implement IPrioritizedReaction are treated as
+            // priority 0 (identical to v1.0 semantics).
             _reactions.Add(reaction);
+            int newPrio = GetPriority(reaction);
+            for (int i = _reactions.Count - 1; i > 0; i--)
+            {
+                if (newPrio > GetPriority(_reactions[i - 1]))
+                {
+                    var swap = _reactions[i];
+                    _reactions[i] = _reactions[i - 1];
+                    _reactions[i - 1] = swap;
+                }
+                else break;
+            }
             _logger.Info($"Reaction '{reaction.Key}' registered.");
         }
 
         public void RemoveReaction(string reactionKey)
         {
+            // RemoveAll preserves the relative order of remaining elements, so the sort
+            // invariant is maintained without re-sorting.
             _reactions.RemoveAll(r => r.Key == reactionKey);
         }
 
@@ -62,47 +81,22 @@ namespace Effectio.Reactions
 
             while (depth < MaxChainDepth)
             {
-                var triggered = FindMatchingReactions(entity);
-                if (triggered.Count == 0)
-                    break;
-
                 // Snapshot current statuses (pooled buffer) so we can detect new ones after the pass.
                 _prevStatusBuffer.Clear();
                 entity.CopyStatusKeysTo(_prevStatusBuffer);
 
-                _toRemoveBuffer.Clear();
+                bool anyTriggeredThisPass = ProcessTiers(entity);
 
-                // Execute ALL matching reactions simultaneously
-                for (int i = 0; i < triggered.Count; i++)
-                {
-                    var reaction = triggered[i];
-                    if (_logger.IsEnabled) _logger.Info($"Reaction '{reaction.Key}' triggered on entity '{entity.Id}'.");
+                if (!anyTriggeredThisPass)
+                    break;
 
-                    var results = reaction.Results;
-                    for (int r = 0; r < results.Length; r++)
-                        ExecuteResult(entity, results[r]);
-
-                    if (reaction.ConsumesStatuses)
-                    {
-                        var keys = reaction.RequiredStatusKeys;
-                        for (int k = 0; k < keys.Length; k++)
-                            _toRemoveBuffer.Add(keys[k]);
-                    }
-
-                    OnReactionTriggered?.Invoke(entity, reaction);
-                }
-
-                // Remove consumed statuses after all reactions in this pass
-                foreach (var statusKey in _toRemoveBuffer)
-                    _statusEngine.RemoveStatus(entity, statusKey);
-
-                // Detect new statuses for chain detection
+                // Detect new statuses for chain detection across passes.
                 _newStatusBuffer.Clear();
                 entity.CopyStatusKeysTo(_newStatusBuffer);
                 _newStatusBuffer.ExceptWith(_prevStatusBuffer);
 
                 if (_newStatusBuffer.Count == 0)
-                    break; // No new statuses — no further chaining possible
+                    break;
 
                 depth++;
             }
@@ -113,16 +107,63 @@ namespace Effectio.Reactions
             }
         }
 
-        private List<IReaction> FindMatchingReactions(IEffectioEntity entity)
+        /// <summary>
+        /// Walks the priority-sorted <c>_reactions</c> list ONCE, grouping consecutive
+        /// equal-priority entries into tiers. Within a tier all matching reactions fire
+        /// simultaneously (against the same pre-consume state); between tiers, consumed
+        /// statuses are removed so the next-lower tier re-evaluates against the
+        /// post-consume state. Total work is O(R) per pass regardless of how many
+        /// distinct priorities are in use.
+        /// </summary>
+        private bool ProcessTiers(IEffectioEntity entity)
         {
-            _matchBuffer.Clear();
-            for (int i = 0; i < _reactions.Count; i++)
+            bool anyFired = false;
+            int i = 0;
+            while (i < _reactions.Count)
             {
-                var reaction = _reactions[i];
-                if (IsReactionSatisfied(entity, reaction))
-                    _matchBuffer.Add(reaction);
+                int tier = GetPriority(_reactions[i]);
+
+                _matchBuffer.Clear();
+                _toRemoveBuffer.Clear();
+
+                // Collect satisfied reactions for this tier.
+                int j = i;
+                while (j < _reactions.Count && GetPriority(_reactions[j]) == tier)
+                {
+                    if (IsReactionSatisfied(entity, _reactions[j]))
+                        _matchBuffer.Add(_reactions[j]);
+                    j++;
+                }
+
+                // Execute all matched reactions in this tier (simultaneously - same
+                // pre-consume view of the entity's statuses).
+                for (int k = 0; k < _matchBuffer.Count; k++)
+                {
+                    var reaction = _matchBuffer[k];
+                    if (_logger.IsEnabled) _logger.Info($"Reaction '{reaction.Key}' triggered on entity '{entity.Id}'.");
+
+                    var results = reaction.Results;
+                    for (int r = 0; r < results.Length; r++)
+                        ExecuteResult(entity, results[r]);
+
+                    if (reaction.ConsumesStatuses)
+                    {
+                        var keys = reaction.RequiredStatusKeys;
+                        for (int k2 = 0; k2 < keys.Length; k2++)
+                            _toRemoveBuffer.Add(keys[k2]);
+                    }
+
+                    OnReactionTriggered?.Invoke(entity, reaction);
+                }
+
+                // Apply consumes for this tier so the next-lower tier sees post-consume state.
+                foreach (var statusKey in _toRemoveBuffer)
+                    _statusEngine.RemoveStatus(entity, statusKey);
+
+                if (_matchBuffer.Count > 0) anyFired = true;
+                i = j;
             }
-            return _matchBuffer;
+            return anyFired;
         }
 
         private bool IsReactionSatisfied(IEffectioEntity entity, IReaction reaction)
@@ -177,6 +218,15 @@ namespace Effectio.Reactions
             }
             return true;
         }
+
+        /// <summary>
+        /// Reads a reaction's priority tier without forcing it to implement
+        /// <see cref="IPrioritizedReaction"/>. Reactions that do not opt in are
+        /// treated as priority 0 (identical to v1.0 behaviour). The pattern match
+        /// JITs to a single typecheck; per-call cost is negligible.
+        /// </summary>
+        private static int GetPriority(IReaction reaction)
+            => reaction is IPrioritizedReaction p ? p.Priority : 0;
 
         private void ExecuteResult(IEffectioEntity entity, IReactionResult result)
         {

@@ -4,6 +4,44 @@ All notable changes to Effectio are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **Reaction priority** via the new `IPrioritizedReaction` interface and
+  `ReactionBuilder.Priority(int)`. Higher-priority reactions fire first, and
+  their consumed statuses are removed before lower-priority reactions
+  re-evaluate, so a high-priority reaction can preempt overlapping
+  low-priority ones in the same tick. Reactions sharing a priority preserve
+  v1.0 "fire simultaneously" semantics. Roadmap task v1.1 #3.
+- **`IPrioritizedReaction : IReaction`** as a separate opt-in interface
+  exposing `int Priority`. The built-in `Reaction` class implements it
+  transparently. Reactions that implement only `IReaction` (including any
+  v1.0 external implementations) are treated as priority 0, identical to
+  v1.0 behaviour.
+
+### Backwards compatibility
+
+- v1.0 source and binary surfaces are preserved. `IReaction` is unchanged,
+  so existing implementations compile and load against v1.1 unmodified. The
+  v1.0 5-parameter `Reaction(...)` constructor is kept as a distinct
+  overload (it delegates to the new 6-parameter form with `priority: 0`),
+  so pre-built v1.0 consumers do not hit `MissingMethodException`.
+  Regression tests cover both paths.
+
+### Performance
+
+- `ReactionEngine` now keeps `_reactions` sorted by priority on register (stable
+  insertion sort, preserves registration order for ties). `CheckReactions` walks
+  the sorted list once per pass, grouping consecutive equal-priority entries
+  into tiers. Total work is O(R) per pass regardless of how many distinct
+  priorities are in use.
+- New `Effectio.Benchmarks.ReactionPriorityBenchmark` covers `AllDefault`,
+  `TwoTiers`, and `ManyTiers` priority shapes at 10/50/100 reactions. Reference
+  numbers on a Coffee Lake i7-9700K, .NET 8: 100 reactions across 100 distinct
+  priorities tick in ~12 us, matching 100 reactions all at default priority
+  (i.e. priority is free at typical scale; 0 B allocated per call).
+
 ## [1.0.0] - 2026-04-17
 
 Initial public release.
