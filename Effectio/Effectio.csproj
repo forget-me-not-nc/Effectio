@@ -1,11 +1,55 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <!-- Build -->
     <TargetFramework>netstandard2.0</TargetFramework>
     <LangVersion>latest</LangVersion>
     <RootNamespace>Effectio</RootNamespace>
     <AssemblyName>Effectio</AssemblyName>
-    <Description>High-performance stats, effects, modifiers, statuses, and elemental reaction system for Unity</Description>
+    <Nullable>disable</Nullable>
+    <Deterministic>true</Deterministic>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- CS1591: don't fail the build on undocumented public members; documentation is opt-in. -->
+    <NoWarn>$(NoWarn);1591</NoWarn>
+
+    <!-- NuGet package identity -->
+    <PackageId>Effectio</PackageId>
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+
+    <!-- NuGet package metadata -->
+    <Authors>Nazar Paliichuk</Authors>
+    <Company>forget-me-not-nc</Company>
+    <Product>Effectio</Product>
+    <Title>Effectio - game stats, effects, statuses and reactions</Title>
+    <Description>High-performance, allocation-free simulation layer for game entity stats, modifiers, effects, statuses, and cross-status reactions. Polymorphic pipelines (no enum switches), single Tick(dt) entry point, zero runtime dependencies. Ships as netstandard2.0 so it runs in .NET and Unity alike.</Description>
+    <PackageTags>game;gamedev;unity;rpg;stats;modifiers;buffs;statuses;effects;reactions;elemental;dot;aura;gameplay;simulation;netstandard</PackageTags>
+    <PackageProjectUrl>https://github.com/forget-me-not-nc/Effectio</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/forget-me-not-nc/Effectio.git</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>See CHANGELOG.md at the repository root. 1.0.0 is the initial public release: polymorphic modifiers / effect actions / triggers / reaction results, pooled hot-path buffers, 0 B/op Tick at 1000 entities.</PackageReleaseNotes>
+    <Copyright>Copyright (c) 2026 Nazar Paliichuk</Copyright>
+
+    <!-- Symbols + source-link for a nicer debugger experience for consumers. -->
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- Bundle the readme and license files into the .nupkg so nuget.org displays them. -->
+    <None Include="..\README.md" Pack="true" PackagePath="\" Visible="false" />
+    <None Include="..\LICENSE.txt" Pack="true" PackagePath="\" Visible="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- SourceLink for GitHub so PDBs point back at source on github.com. -->
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
+  </ItemGroup>
+
 </Project>
+

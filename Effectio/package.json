@@ -1,0 +1,27 @@
+{
+  "name": "com.forget-me-not-nc.effectio",
+  "version": "1.0.0",
+  "displayName": "Effectio",
+  "description": "High-performance, allocation-free simulation layer for game entity stats, modifiers, effects, statuses, and cross-status reactions. Polymorphic pipelines, single Tick(dt) entry point, zero runtime dependencies.",
+  "unity": "2021.3",
+  "author": {
+    "name": "Nazar Paliichuk",
+    "url": "https://github.com/forget-me-not-nc"
+  },
+  "license": "MIT",
+  "keywords": [
+    "gameplay",
+    "stats",
+    "modifiers",
+    "buffs",
+    "statuses",
+    "effects",
+    "reactions",
+    "rpg",
+    "simulation"
+  ],
+  "documentationUrl": "https://github.com/forget-me-not-nc/Effectio#readme",
+  "changelogUrl": "https://github.com/forget-me-not-nc/Effectio/blob/main/CHANGELOG.md",
+  "licensesUrl": "https://github.com/forget-me-not-nc/Effectio/blob/main/LICENSE.txt",
+  "dependencies": {}
+}

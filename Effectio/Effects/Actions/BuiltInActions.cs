@@ -1,5 +1,6 @@
 using System;
 using Effectio.Modifiers;
+using Effectio.Stats;
 
 namespace Effectio.Effects.Actions
 {
