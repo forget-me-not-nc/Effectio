@@ -7,9 +7,6 @@ automatically when statuses combine.
 
 ![demo gif placeholder](docs/demo.gif)
 
-> Recording instructions for the GIF above are in
-> [Recording your own GIF](#recording-your-own-gif) below.
-
 ## What is in the scene
 
 | Pad | Color | What it does |
