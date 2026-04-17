@@ -106,19 +106,22 @@ namespace Effectio.Reactions
         public string[] RequiredTags { get; }
         public bool ConsumesStatuses { get; }
         public IReactionResult[] Results { get; }
+        public int Priority { get; }
 
         public Reaction(
             string key,
             string[] requiredStatusKeys = null,
             string[] requiredTags = null,
             bool consumesStatuses = true,
-            IReactionResult[] results = null)
+            IReactionResult[] results = null,
+            int priority = 0)
         {
             Key = key;
             RequiredStatusKeys = requiredStatusKeys ?? new string[0];
             RequiredTags = requiredTags ?? new string[0];
             ConsumesStatuses = consumesStatuses;
             Results = results ?? new IReactionResult[0];
+            Priority = priority;
         }
     }
 }

@@ -43,6 +43,15 @@ namespace Effectio.Reactions
         string[] RequiredTags { get; }
         bool ConsumesStatuses { get; }
         IReactionResult[] Results { get; }
+
+        /// <summary>
+        /// Tier in which this reaction fires when multiple reactions match in the same
+        /// pass. Higher values fire first; their consumed statuses are removed before
+        /// the next-lower tier re-evaluates, so a high-priority reaction can preempt
+        /// lower-priority reactions whose required statuses overlap. Default is 0.
+        /// Reactions sharing a priority fire simultaneously (current v1.0 semantics).
+        /// </summary>
+        int Priority { get; }
     }
 }
 

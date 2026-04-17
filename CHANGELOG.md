@@ -4,6 +4,30 @@ All notable changes to Effectio are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **Reaction priority** (`IReaction.Priority`, `ReactionBuilder.Priority(int)`).
+  Higher-priority reactions fire first, and their consumed statuses are removed
+  before lower-priority reactions re-evaluate, so a high-priority reaction can
+  preempt overlapping low-priority ones in the same tick. Reactions sharing a
+  priority preserve v1.0 "fire simultaneously" semantics. Default priority is 0,
+  so existing reactions behave identically. Roadmap task v1.1 #3.
+
+### Performance
+
+- `ReactionEngine` now keeps `_reactions` sorted by priority on register (stable
+  insertion sort, preserves registration order for ties). `CheckReactions` walks
+  the sorted list once per pass, grouping consecutive equal-priority entries
+  into tiers. Total work is O(R) per pass regardless of how many distinct
+  priorities are in use.
+- New `Effectio.Benchmarks.ReactionPriorityBenchmark` covers `AllDefault`,
+  `TwoTiers`, and `ManyTiers` priority shapes at 10/50/100 reactions. Reference
+  numbers on a Coffee Lake i7-9700K, .NET 8: 100 reactions across 100 distinct
+  priorities tick in ~12 us, matching 100 reactions all at default priority
+  (i.e. priority is free at typical scale; 0 B allocated per call).
+
 ## [1.0.0] - 2026-04-17
 
 Initial public release.

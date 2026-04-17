@@ -13,11 +13,20 @@ namespace Effectio.Builders
         private readonly List<string> _requiredTags = new List<string>();
         private bool _consumesStatuses = true;
         private readonly List<IReactionResult> _results = new List<IReactionResult>();
+        private int _priority = 0;
 
         public ReactionBuilder(string key)
         {
             _key = key;
         }
+
+        /// <summary>
+        /// Sets the priority tier. Higher tiers fire first and their consumed statuses
+        /// are removed before lower tiers re-evaluate, so a high-priority reaction can
+        /// preempt lower-priority reactions whose required statuses overlap. Reactions
+        /// sharing a priority fire simultaneously. Default is 0.
+        /// </summary>
+        public ReactionBuilder Priority(int priority) { _priority = priority; return this; }
 
         public static ReactionBuilder Create(string key) => new ReactionBuilder(key);
 
@@ -80,6 +89,7 @@ namespace Effectio.Builders
             _requiredStatusKeys.ToArray(),
             _requiredTags.ToArray(),
             _consumesStatuses,
-            _results.ToArray());
+            _results.ToArray(),
+            _priority);
     }
 }
