@@ -371,3 +371,15 @@ artifacts/
 
 # Redirected MSBuild output for Effectio package
 build/
+
+# Unity demo's Packages/ folder must be tracked (UPM manifest + lockfile).
+# The .NET template's **/[Pp]ackages/* rule above otherwise hides them.
+!samples/UnityDemo/Packages/
+!samples/UnityDemo/Packages/**
+
+# Unity .meta sidecars (per-asset GUID stability). The .NET template's
+# *.meta rule (line ~75) is meant for Visual Studio plugin metadata;
+# undo it inside the Unity demo's Assets folder.
+!samples/UnityDemo/Assets/**/*.meta
+
+
