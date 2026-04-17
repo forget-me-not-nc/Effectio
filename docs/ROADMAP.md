@@ -1,0 +1,57 @@
+# Roadmap
+
+A living list of work proposed for upcoming releases. Each row in the
+tables below becomes a GitHub issue when its milestone is opened. Sizes:
+**XS** ~1 h, **S** ~half day, **M** ~1-2 days, **L** ~3+ days.
+
+> **About the IDs.** Task numbers (`#1`, `#2`, ...) reset inside each
+> milestone section and are issue-tracker IDs, not release tags. The
+> section heading is the release tag (`v1.1.0`, `v1.2.0`, ...). Every
+> task in a section ships together under that one tag.
+
+> **About SemVer.** `MAJOR.MINOR.PATCH` - bump MAJOR for breaking API
+> changes, MINOR for new backwards-compatible features, PATCH for bug
+> fixes only. Effectio's milestones are MINOR releases; a `v2.0.0` will
+> only happen when something must break to move forward. Standalone bug
+> fixes between milestones may ship as `v1.0.1`, `v1.0.2`, ...
+
+## v1.1.0 - "Stacks, properly"
+
+Closes the design gaps that the v1.0 sample surfaced: stack-aware
+reactions, stack-scaled effect actions, and the small core tweaks that
+come with them. Ships as one `v1.1.0` tag once every task in this
+section lands.
+
+| # | Task | Why | Size |
+|---|---|---|---|
+| 1 | **Stack-aware reactions.** `RequireStacks(key, min)`, `ConsumesStacks(key, count)`, `ScaleResultsByMinStackCount()`. | Lets "3 stacks of Burning -> Inferno" be expressible declaratively. | M |
+| 2 | **Stack-scaled effect actions.** `EffectBuilder.AdjustStat("Health", -5f).PerStackOf("Burning")`. | Removes the need to write a custom `IEffectAction` for `Bleeding x3 = -3 HP/s`. | S |
+| 3 | **Reaction priority.** Explicit `.Priority(int)` so registration order does not silently determine which reaction wins. | Today the 5-condition Apocalypse only fires if registered before its 2-condition subsets. Easy to get wrong. | S |
+| 4 | **Effect catalog + wire `OnApplyEffect`.** `manager.Effects.RegisterEffect(IEffect)`; `ReactionBuilder.ApplyEffect(string)` resolves through the catalog. | Closes the bug found designing Overload (`ApplyEffect(string)` is currently a no-op from reactions). | M |
+| 5 | **`entity.GetStatusStackCount(key)` shortcut.** | Today consumers have to reach into `manager.Statuses.GetStacks(...)`. Pure ergonomics. | XS |
+| 6 | **Per-stack expiration semantics: test + docs.** Decide whether stacks expire all-at-once or one-at-a-time, lock with tests, document. | Current behaviour is an implementation detail. | S |
+| 7 | **`StatusBuilder.OnRefresh(IEffect)`.** Fire an effect when a status is re-applied while still active. | Useful for "stacking refresh also ticks burst damage" patterns. | S |
+| 8 | **`Conditional` effect action.** `.WhenStatBelow(stat, value, then, else)` without writing a custom action. | Sugar for "heal if low HP, otherwise damage". | S |
+| 9 | **Stack-aware ticks.** `StatusBuilder.OnTick(effect).PerStack()` so `Bleeding x3` ticks 3 x -1 HP. | Companion to task #2; status-side counterpart. | S |
+| 10 | **README: registration-order rule + reaction priority.** Document the gotcha until task #3 ships. | Cheap, prevents foot-guns for early users. | XS |
+
+## v1.2.0 - "Authoring"
+
+Optional packages + sugar that make it easy to author content outside
+C#. Ships as one `v1.2.0` tag after the v1.1.0 milestone closes.
+
+| # | Task | Why | Size |
+|---|---|---|---|
+| 1 | **`Effectio.Serialization.Json`** package: DTO records + `System.Text.Json` loader for effects, statuses, reactions. | Lets games author content as JSON without dragging the dependency into the core. | L |
+| 2 | **`Effectio.Unity`** package: `EffectioWorldBehaviour`, `CharacterStatsBehaviour`, `ScriptableObject` wrappers mirroring the DTOs. | Pulls the boilerplate out of every Unity consumer's project. | L |
+| 3 | **`Effectio.Unity` sample:** convert `samples/UnityDemo` to use the ScriptableObject authoring path. | Validates the authoring story end-to-end. | M |
+
+## Backlog (no milestone yet)
+
+- Comparison vs. Unity GAS / Gameplay Ability System in README + a small port-from-GAS guide.
+- Determinism mode (fixed-point arithmetic for lockstep multiplayer).
+- Snapshot / replay support: serialise the full simulation state for save-load and rewind.
+- Source generators for stat / status / reaction key constants (no more magic strings).
+- Optional Unity Editor inspector for `EffectioWorldBehaviour` showing live status / modifier breakdown.
+
+
