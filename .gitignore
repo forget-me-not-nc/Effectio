@@ -368,3 +368,6 @@ artifacts/
 # AI coding assistants � local-only, do not commit
 .claude/
 .github/copilot-instructions.md
+
+# Redirected MSBuild output for Effectio package
+build/

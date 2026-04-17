@@ -1,0 +1,20 @@
+<!--
+  Redirect Effectio's build output OUTSIDE the package folder.
+
+  Why: this folder doubles as a Unity Package Manager (UPM) package. If the
+  compiled Effectio.dll lives in Effectio/bin/ and Unity imports the package,
+  Unity sees both the source .cs files AND the .dll - every public type is
+  then defined twice (CS0436 / CS0579).
+
+  Effect: Effectio/bin and Effectio/obj are no longer created. Output lands
+  at <repo>/build/bin/Effectio/<config>/<tfm>/ and <repo>/build/obj/Effectio/.
+  Other projects (Effectio.Tests, Effectio.Benchmarks) are unaffected
+  because this Directory.Build.props only applies to projects in the Effectio
+  folder.
+-->
+<Project>
+  <PropertyGroup>
+    <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)..\build\obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
+    <BaseOutputPath>$(MSBuildThisFileDirectory)..\build\bin\$(MSBuildProjectName)\</BaseOutputPath>
+  </PropertyGroup>
+</Project>
