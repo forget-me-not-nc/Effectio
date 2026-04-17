@@ -68,14 +68,14 @@ namespace Effectio.Statuses
             // Check immunity
             if (IsImmune(entity, statusKey))
             {
-                _logger.Info($"Status '{statusKey}' blocked on entity '{entity.Id}' (immune).");
+                if (_logger.IsEnabled) _logger.Info($"Status '{statusKey}' blocked on entity '{entity.Id}' (immune).");
                 OnStatusBlocked?.Invoke(entity, statusKey);
                 return;
             }
 
             if (!_statusDefinitions.TryGetValue(statusKey, out var definition))
             {
-                _logger.Warning($"Status '{statusKey}' is not registered. Applying as a simple tag.");
+                if (_logger.IsEnabled) _logger.Warning($"Status '{statusKey}' is not registered. Applying as a simple tag.");
                 // Allow applying unregistered statuses as simple tags (no duration/effects)
                 entity.AddStatus(statusKey);
                 OnStatusApplied?.Invoke(entity, statusKey);
@@ -111,7 +111,7 @@ namespace Effectio.Statuses
             entityStatuses[statusKey] = data;
             entity.AddStatus(statusKey);
 
-            _logger.Info($"Status '{statusKey}' applied to entity '{entity.Id}'.");
+            if (_logger.IsEnabled) _logger.Info($"Status '{statusKey}' applied to entity '{entity.Id}'.");
             OnStatusApplied?.Invoke(entity, statusKey);
         }
 
@@ -124,7 +124,7 @@ namespace Effectio.Statuses
                 entityStatuses.Remove(statusKey);
             }
 
-            _logger.Info($"Status '{statusKey}' removed from entity '{entity.Id}'.");
+            if (_logger.IsEnabled) _logger.Info($"Status '{statusKey}' removed from entity '{entity.Id}'.");
             OnStatusRemoved?.Invoke(entity, statusKey);
         }
 

@@ -43,6 +43,7 @@ namespace Effectio.Reactions
         private readonly HashSet<string> _prevStatusBuffer = new HashSet<string>();
         private readonly HashSet<string> _newStatusBuffer = new HashSet<string>();
         private readonly HashSet<string> _entityTagsBuffer = new HashSet<string>();
+        private readonly HashSet<string> _statusSnapshotBuffer = new HashSet<string>();
 
         public void RegisterReaction(IReaction reaction)
         {
@@ -67,8 +68,7 @@ namespace Effectio.Reactions
 
                 // Snapshot current statuses (pooled buffer) so we can detect new ones after the pass.
                 _prevStatusBuffer.Clear();
-                foreach (var s in entity.ActiveStatusKeys)
-                    _prevStatusBuffer.Add(s);
+                entity.CopyStatusKeysTo(_prevStatusBuffer);
 
                 _toRemoveBuffer.Clear();
 
@@ -76,7 +76,7 @@ namespace Effectio.Reactions
                 for (int i = 0; i < triggered.Count; i++)
                 {
                     var reaction = triggered[i];
-                    _logger.Info($"Reaction '{reaction.Key}' triggered on entity '{entity.Id}'.");
+                    if (_logger.IsEnabled) _logger.Info($"Reaction '{reaction.Key}' triggered on entity '{entity.Id}'.");
 
                     var results = reaction.Results;
                     for (int r = 0; r < results.Length; r++)
@@ -98,9 +98,8 @@ namespace Effectio.Reactions
 
                 // Detect new statuses for chain detection
                 _newStatusBuffer.Clear();
-                foreach (var s in entity.ActiveStatusKeys)
-                    if (!_prevStatusBuffer.Contains(s))
-                        _newStatusBuffer.Add(s);
+                entity.CopyStatusKeysTo(_newStatusBuffer);
+                _newStatusBuffer.ExceptWith(_prevStatusBuffer);
 
                 if (_newStatusBuffer.Count == 0)
                     break; // No new statuses — no further chaining possible
@@ -110,7 +109,7 @@ namespace Effectio.Reactions
 
             if (depth >= MaxChainDepth)
             {
-                _logger.Warning($"Reaction chain depth limit ({MaxChainDepth}) reached on entity '{entity.Id}'.");
+                if (_logger.IsEnabled) _logger.Warning($"Reaction chain depth limit ({MaxChainDepth}) reached on entity '{entity.Id}'.");
             }
         }
 
@@ -155,9 +154,12 @@ namespace Effectio.Reactions
         private bool AreTagsSatisfied(IEffectioEntity entity, string[] requiredTags)
         {
             // Each required tag must be present on at least one active status.
-            // Reuses the pooled tag buffer to avoid per-check allocation.
+            // Uses pooled buffers throughout — zero allocation per call.
+            _statusSnapshotBuffer.Clear();
+            entity.CopyStatusKeysTo(_statusSnapshotBuffer);
+
             _entityTagsBuffer.Clear();
-            foreach (var statusKey in entity.ActiveStatusKeys)
+            foreach (var statusKey in _statusSnapshotBuffer) // HashSet struct enumerator, no boxing
             {
                 var definition = _statusEngine.GetStatusDefinition(statusKey);
                 if (definition?.Tags != null)

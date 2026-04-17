@@ -225,6 +225,30 @@ manager.Statuses.OnStatusBlocked += (entity, key) => { /* … */ };
 player.GetStat("Health").OnValueChanged += (stat, oldV, newV) => { /* UI update */ };
 ```
 
+## Performance
+
+Effectio is built to run inside a game tick. The simulation layer avoids runtime reflection and pools hot-path buffers so the built-in pipelines do not allocate during a steady-state frame. Benchmarks (BenchmarkDotNet, net8.0 Release, x64 RyuJIT):
+
+| Scenario                                   | Size | Mean        | Allocated |
+|--------------------------------------------|-----:|------------:|----------:|
+| `Stat.Recalculate` (mixed modifier kinds)  |    1 |       7 ns  |     0 B   |
+|                                            |   10 |      27 ns  |     0 B   |
+|                                            |   50 |     144 ns  |     0 B   |
+|                                            |  200 |     578 ns  |     0 B   |
+| `Stat.TickModifiers` (permanent modifiers) |   10 |      44 ns  |     0 B   |
+|                                            |  100 |     350 ns  |     0 B   |
+| `EffectioManager.Tick` (real mixed workload:<br/>DoT + timed buff + aura + triggered + burn status) |   10 |     458 ns  |     0 B   |
+|                                            |  100 |     5.2 µs  |     0 B   |
+|                                            | 1000 |    62.3 µs  |     0 B   |
+
+At **1000 entities / 60 Hz** the whole tick costs ~62 µs — about **0.37 %** of the 16.6 ms frame budget, with zero GC pressure.
+
+Run the benchmarks yourself:
+
+```bash
+dotnet run -c Release --project Effectio.Benchmarks -- --filter '*ManagerTickBenchmark*'
+```
+
 ## License
 
 See [LICENSE.txt](LICENSE.txt).

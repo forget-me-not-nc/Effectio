@@ -42,8 +42,22 @@ namespace Effectio.Entities
 
         public bool HasStat(string key) => _stats.ContainsKey(key);
 
+        public void TickStatModifiers(float deltaTime)
+        {
+            // Uses Dictionary<K,V>.Enumerator (struct) — no enumerator boxing on the hot path.
+            foreach (var kvp in _stats)
+                kvp.Value.TickModifiers(deltaTime);
+        }
+
         public void AddStatus(string statusKey) => _statusKeys.Add(statusKey);
         public void RemoveStatus(string statusKey) => _statusKeys.Remove(statusKey);
         public bool HasStatus(string statusKey) => _statusKeys.Contains(statusKey);
+
+        public void CopyStatusKeysTo(ICollection<string> dest)
+        {
+            // Iterates the concrete HashSet via its struct enumerator — no boxing.
+            foreach (var key in _statusKeys)
+                dest.Add(key);
+        }
     }
 }

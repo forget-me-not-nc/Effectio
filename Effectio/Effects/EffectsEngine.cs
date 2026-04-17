@@ -57,7 +57,7 @@ namespace Effectio.Effects
             }
 
             OnEffectApplied?.Invoke(entity, effect);
-            _logger.Info($"Effect '{effect.Key}' applied to entity '{entity.Id}'.");
+            if (_logger.IsEnabled) _logger.Info($"Effect '{effect.Key}' applied to entity '{entity.Id}'.");
         }
 
         public void RemoveEffect(IEffectioEntity entity, string effectKey)
@@ -77,7 +77,7 @@ namespace Effectio.Effects
 
                     effects.RemoveAt(i);
                     OnEffectRemoved?.Invoke(entity, effect);
-                    _logger.Info($"Effect '{effectKey}' removed from entity '{entity.Id}'.");
+                    if (_logger.IsEnabled) _logger.Info($"Effect '{effectKey}' removed from entity '{entity.Id}'.");
                 }
             }
         }
@@ -138,7 +138,7 @@ namespace Effectio.Effects
 
                     effects.RemoveAt(i);
                     OnEffectRemoved?.Invoke(entity, active.Effect);
-                    _logger.Info($"Effect '{active.Effect.Key}' expired on entity '{entity.Id}'.");
+                    if (_logger.IsEnabled) _logger.Info($"Effect '{active.Effect.Key}' expired on entity '{entity.Id}'.");
                     continue;
                 }
 
