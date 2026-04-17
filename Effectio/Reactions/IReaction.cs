@@ -43,14 +43,23 @@ namespace Effectio.Reactions
         string[] RequiredTags { get; }
         bool ConsumesStatuses { get; }
         IReactionResult[] Results { get; }
+    }
 
-        /// <summary>
-        /// Tier in which this reaction fires when multiple reactions match in the same
-        /// pass. Higher values fire first; their consumed statuses are removed before
-        /// the next-lower tier re-evaluates, so a high-priority reaction can preempt
-        /// lower-priority reactions whose required statuses overlap. Default is 0.
-        /// Reactions sharing a priority fire simultaneously (current v1.0 semantics).
-        /// </summary>
+    /// <summary>
+    /// Optional opt-in extension of <see cref="IReaction"/> exposing a priority tier.
+    /// Reactions implementing this interface fire in the order their <see cref="Priority"/>
+    /// dictates (higher first); their consumed statuses are removed before the next-lower
+    /// tier re-evaluates, so a high-priority reaction can preempt overlapping low-priority
+    /// ones in the same tick. Reactions that do NOT implement this interface are treated
+    /// as priority 0 - identical to the v1.0 "fire simultaneously" behaviour.
+    /// </summary>
+    /// <remarks>
+    /// Kept as a separate interface (rather than added to <see cref="IReaction"/>) to
+    /// preserve binary compatibility for any v1.0 consumer that implemented
+    /// <see cref="IReaction"/> directly.
+    /// </remarks>
+    public interface IPrioritizedReaction : IReaction
+    {
         int Priority { get; }
     }
 }

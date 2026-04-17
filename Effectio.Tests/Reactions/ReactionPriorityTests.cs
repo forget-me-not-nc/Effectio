@@ -42,14 +42,14 @@ namespace Effectio.Tests.Reactions
             var r = new Reaction("r");
             Assert.AreEqual(0, r.Priority);
 
-            var built = ReactionBuilder.Create("b").RequireStatus("Burning").Build();
+            var built = (IPrioritizedReaction)ReactionBuilder.Create("b").RequireStatus("Burning").Build();
             Assert.AreEqual(0, built.Priority);
         }
 
         [TestMethod]
         public void Builder_SetsPriority()
         {
-            var r = ReactionBuilder.Create("r").RequireStatus("Burning").Priority(42).Build();
+            var r = (IPrioritizedReaction)ReactionBuilder.Create("r").RequireStatus("Burning").Priority(42).Build();
             Assert.AreEqual(42, r.Priority);
         }
 
@@ -83,7 +83,7 @@ namespace Effectio.Tests.Reactions
         [TestMethod]
         public void Reaction_SupportsNegativePriority()
         {
-            var r = ReactionBuilder.Create("r").RequireStatus("Burning").Priority(-100).Build();
+            var r = (IPrioritizedReaction)ReactionBuilder.Create("r").RequireStatus("Burning").Priority(-100).Build();
             Assert.AreEqual(-100, r.Priority);
         }
 
@@ -237,6 +237,83 @@ namespace Effectio.Tests.Reactions
             _reactionEngine.CheckReactions(_entity);
 
             CollectionAssert.AreEqual(new[] { "High", "Mid", "Low" }, order);
+        }
+
+        // -------- v1.0 backward-compatibility regression tests --------
+
+        [TestMethod]
+        public void V10Ctor_StillWorksAndDefaultsPriorityToZero()
+        {
+            // Calls the original 5-parameter Reaction ctor (no priority arg). This is
+            // the IL signature pre-built v1.0 consumers reference; it must keep working.
+            var r = new Reaction(
+                "legacy",
+                requiredStatusKeys: new[] { "Wet" },
+                requiredTags: new string[0],
+                consumesStatuses: false,
+                results: new IReactionResult[] { new ApplyStatusResult("Shocked") });
+
+            Assert.AreEqual(0, r.Priority);
+
+            _statusEngine.RegisterStatus(new Status("Shocked"));
+            _reactionEngine.RegisterReaction(r);
+            _statusEngine.ApplyStatus(_entity, "Wet");
+            _reactionEngine.CheckReactions(_entity);
+
+            Assert.IsTrue(_entity.HasStatus("Shocked"));
+        }
+
+        /// <summary>
+        /// Minimal external <see cref="IReaction"/> implementation that does NOT
+        /// implement <see cref="IPrioritizedReaction"/>. Mirrors what a v1.0 consumer
+        /// might have written by hand against the original interface. The engine must
+        /// treat this as priority 0 and still fire it correctly.
+        /// </summary>
+        private sealed class LegacyExternalReaction : IReaction
+        {
+            public string Key { get; }
+            public string[] RequiredStatusKeys { get; }
+            public string[] RequiredTags => new string[0];
+            public bool ConsumesStatuses => true;
+            public IReactionResult[] Results { get; }
+
+            public LegacyExternalReaction(string key, string requiredStatus, IReactionResult result)
+            {
+                Key = key;
+                RequiredStatusKeys = new[] { requiredStatus };
+                Results = new[] { result };
+            }
+        }
+
+        [TestMethod]
+        public void ExternalIReactionWithoutPriority_TreatedAsTierZero()
+        {
+            // A high-priority IPrioritizedReaction and a legacy external IReaction (no
+            // IPrioritizedReaction implementation). The high-priority one fires first,
+            // the legacy one fires after as part of tier 0.
+            var order = new List<string>();
+            _reactionEngine.OnReactionTriggered += (_, r) => order.Add(r.Key);
+
+            _reactionEngine.RegisterReaction(new LegacyExternalReaction(
+                "Legacy",
+                requiredStatus: "Charged",
+                result: new ApplyStatusResult("Shocked")));
+
+            _reactionEngine.RegisterReaction(ReactionBuilder.Create("High")
+                .RequireStatus("Burning")
+                .ConsumesStatuses()
+                .Priority(100)
+                .ApplyStatus("Apocalypsed")
+                .Build());
+
+            _statusEngine.ApplyStatus(_entity, "Burning");
+            _statusEngine.ApplyStatus(_entity, "Charged");
+            _reactionEngine.CheckReactions(_entity);
+
+            // High (priority 100) fires before Legacy (priority 0 by default).
+            CollectionAssert.AreEqual(new[] { "High", "Legacy" }, order);
+            Assert.IsTrue(_entity.HasStatus("Apocalypsed"));
+            Assert.IsTrue(_entity.HasStatus("Shocked"));
         }
     }
 }

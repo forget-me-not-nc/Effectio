@@ -99,7 +99,7 @@ namespace Effectio.Reactions
         public virtual void Execute(in ReactionResultContext ctx) { }
     }
 
-    public class Reaction : IReaction
+    public class Reaction : IPrioritizedReaction
     {
         public string Key { get; }
         public string[] RequiredStatusKeys { get; }
@@ -108,13 +108,31 @@ namespace Effectio.Reactions
         public IReactionResult[] Results { get; }
         public int Priority { get; }
 
+        /// <summary>
+        /// v1.0-compatible constructor. Kept as a distinct overload (not merged into the
+        /// 6-parameter form via an optional argument) so the original IL method signature
+        /// still exists; pre-built v1.0 consumers calling this ctor continue to resolve
+        /// it without a <c>MissingMethodException</c>. New callers should prefer the
+        /// 6-parameter overload (or <c>ReactionBuilder.Priority(int)</c>).
+        /// </summary>
         public Reaction(
             string key,
             string[] requiredStatusKeys = null,
             string[] requiredTags = null,
             bool consumesStatuses = true,
-            IReactionResult[] results = null,
-            int priority = 0)
+            IReactionResult[] results = null)
+            : this(key, requiredStatusKeys, requiredTags, consumesStatuses, results, priority: 0)
+        {
+        }
+
+        /// <summary>v1.1 constructor adding the <paramref name="priority"/> tier.</summary>
+        public Reaction(
+            string key,
+            string[] requiredStatusKeys,
+            string[] requiredTags,
+            bool consumesStatuses,
+            IReactionResult[] results,
+            int priority)
         {
             Key = key;
             RequiredStatusKeys = requiredStatusKeys ?? new string[0];

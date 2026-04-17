@@ -51,10 +51,13 @@ namespace Effectio.Reactions
             // left neighbour. Strict (>, not >=) inequality keeps the sort *stable* for
             // ties, preserving registration order among equal-priority reactions - which
             // is the v1.0-equivalent "fire simultaneously" behaviour callers rely on.
+            // Reactions that do not implement IPrioritizedReaction are treated as
+            // priority 0 (identical to v1.0 semantics).
             _reactions.Add(reaction);
+            int newPrio = GetPriority(reaction);
             for (int i = _reactions.Count - 1; i > 0; i--)
             {
-                if (_reactions[i].Priority > _reactions[i - 1].Priority)
+                if (newPrio > GetPriority(_reactions[i - 1]))
                 {
                     var swap = _reactions[i];
                     _reactions[i] = _reactions[i - 1];
@@ -118,14 +121,14 @@ namespace Effectio.Reactions
             int i = 0;
             while (i < _reactions.Count)
             {
-                int tier = _reactions[i].Priority;
+                int tier = GetPriority(_reactions[i]);
 
                 _matchBuffer.Clear();
                 _toRemoveBuffer.Clear();
 
                 // Collect satisfied reactions for this tier.
                 int j = i;
-                while (j < _reactions.Count && _reactions[j].Priority == tier)
+                while (j < _reactions.Count && GetPriority(_reactions[j]) == tier)
                 {
                     if (IsReactionSatisfied(entity, _reactions[j]))
                         _matchBuffer.Add(_reactions[j]);
@@ -215,6 +218,15 @@ namespace Effectio.Reactions
             }
             return true;
         }
+
+        /// <summary>
+        /// Reads a reaction's priority tier without forcing it to implement
+        /// <see cref="IPrioritizedReaction"/>. Reactions that do not opt in are
+        /// treated as priority 0 (identical to v1.0 behaviour). The pattern match
+        /// JITs to a single typecheck; per-call cost is negligible.
+        /// </summary>
+        private static int GetPriority(IReaction reaction)
+            => reaction is IPrioritizedReaction p ? p.Priority : 0;
 
         private void ExecuteResult(IEffectioEntity entity, IReactionResult result)
         {

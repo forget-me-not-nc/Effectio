@@ -8,12 +8,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- **Reaction priority** (`IReaction.Priority`, `ReactionBuilder.Priority(int)`).
-  Higher-priority reactions fire first, and their consumed statuses are removed
-  before lower-priority reactions re-evaluate, so a high-priority reaction can
-  preempt overlapping low-priority ones in the same tick. Reactions sharing a
-  priority preserve v1.0 "fire simultaneously" semantics. Default priority is 0,
-  so existing reactions behave identically. Roadmap task v1.1 #3.
+- **Reaction priority** via the new `IPrioritizedReaction` interface and
+  `ReactionBuilder.Priority(int)`. Higher-priority reactions fire first, and
+  their consumed statuses are removed before lower-priority reactions
+  re-evaluate, so a high-priority reaction can preempt overlapping
+  low-priority ones in the same tick. Reactions sharing a priority preserve
+  v1.0 "fire simultaneously" semantics. Roadmap task v1.1 #3.
+- **`IPrioritizedReaction : IReaction`** as a separate opt-in interface
+  exposing `int Priority`. The built-in `Reaction` class implements it
+  transparently. Reactions that implement only `IReaction` (including any
+  v1.0 external implementations) are treated as priority 0, identical to
+  v1.0 behaviour.
+
+### Backwards compatibility
+
+- v1.0 source and binary surfaces are preserved. `IReaction` is unchanged,
+  so existing implementations compile and load against v1.1 unmodified. The
+  v1.0 5-parameter `Reaction(...)` constructor is kept as a distinct
+  overload (it delegates to the new 6-parameter form with `priority: 0`),
+  so pre-built v1.0 consumers do not hit `MissingMethodException`.
+  Regression tests cover both paths.
 
 ### Performance
 
