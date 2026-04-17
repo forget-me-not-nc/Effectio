@@ -320,7 +320,9 @@ You can make `EffectBuilder` / `StatusBuilder` / `ReactionBuilder` calls once at
 
 ### Runnable sample
 
-A full working demo lives at [`samples/UnityDemo`](samples/UnityDemo) in this repository. It references Effectio by local `file:` path so edits to the core show up in Unity immediately. Open the folder in Unity Hub (2022.3 LTS), add a `DemoBootstrap` component to an empty GameObject, press Play, and press `F` / `W` / `H` to drive the full elemental-reaction flow.
+A full **walkable** demo lives at [`samples/UnityDemo`](samples/UnityDemo) in this repository. It references Effectio by local `file:` path so edits to the core show up in Unity immediately. Open the folder in Unity Hub (2022.3 LTS), add a `DemoBootstrap` component to an empty GameObject, press Play, and walk a cube onto coloured floor pads to apply elemental statuses; five reactions (`Vaporize`, `Electrocuted`, `Overload`, `Frostbite`, `Apocalypse`) fire automatically when statuses combine.
+
+![Unity walkable demo](samples/UnityDemo/docs/demo.gif)
 
 ---
 
