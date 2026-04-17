@@ -14,23 +14,30 @@ namespace EffectioDemo
         [SerializeField] string _displayName = "Character";
         [SerializeField] float _maxHealth = 100f;
         [SerializeField] float _baseDamage = 15f;
+        [SerializeField] float _baseSpeed = 6f;
+        [SerializeField] float _minHealth = 0f;
 
         public string DisplayName => _displayName;
         public IEffectioEntity Entity { get; private set; }
 
         public float Health => Entity.GetStat("Health").CurrentValue;
         public float MaxHealth => _maxHealth;
-        public bool IsAlive => Health > 0f;
+        public bool IsAlive => Health > _minHealth;
 
         /// <summary>
         /// Configure this character at runtime. Must be called before <c>Start</c>
         /// runs (so typically immediately after <c>AddComponent</c>).
+        /// <paramref name="minHealth"/> &gt; 0 keeps the character alive forever
+        /// (handy for demos so the player cannot die from environmental damage).
         /// </summary>
-        public void Configure(string displayName, float maxHealth, float baseDamage)
+        public void Configure(string displayName, float maxHealth, float baseDamage,
+                              float minHealth = 0f, float baseSpeed = 6f)
         {
             _displayName = displayName;
             _maxHealth = maxHealth;
             _baseDamage = baseDamage;
+            _minHealth = minHealth;
+            _baseSpeed = baseSpeed;
         }
 
         void Start()
@@ -44,17 +51,14 @@ namespace EffectioDemo
 
             var world = EffectioWorld.Instance.Manager;
 
-            // Each character gets a unique entity keyed by instance id so two
-            // enemies can safely share a display name.
             Entity = world.CreateEntity(_displayName + "_" + GetInstanceID());
-            Entity.AddStat(new Stat("Health", _maxHealth, 0f, _maxHealth));
+            Entity.AddStat(new Stat("Health", _maxHealth, _minHealth, _maxHealth));
             Entity.AddStat(new Stat("Damage", _baseDamage));
+            Entity.AddStat(new Stat("Speed", _baseSpeed));
 
-            // Effectio raises OnValueChanged whenever a stat actually changes;
-            // perfect place to drive Unity-side reactions like death / UI.
             Entity.GetStat("Health").OnValueChanged += (_, _, newHp) =>
             {
-                if (newHp <= 0f && isActiveAndEnabled) Die();
+                if (newHp <= _minHealth && isActiveAndEnabled) Die();
             };
         }
 
