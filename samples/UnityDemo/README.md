@@ -5,7 +5,7 @@ gameplay in Unity. You walk a cube around a 30x30 floor and step onto coloured
 pads; each pad applies a different effect or status, and three reactions fire
 automatically when statuses combine.
 
-![demo gif placeholder](docs/demo.gif)
+![demo gif placeholder](Docs/demo.gif)
 
 ## What is in the scene
 
