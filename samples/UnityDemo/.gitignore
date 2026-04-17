@@ -1,0 +1,26 @@
+# Unity editor-generated folders (all machine-local, never commit)
+Library/
+Temp/
+Obj/
+Build/
+Builds/
+Logs/
+UserSettings/
+MemoryCaptures/
+
+# Visual Studio / Rider clutter that Unity regenerates
+*.csproj
+*.sln
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+.vs/
+.vsconfig
+.idea/
+
+# Unity asset server / collab
+sysinfo.txt
+
+# Crash reports
+crashlytics-build.properties
