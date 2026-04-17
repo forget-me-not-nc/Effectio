@@ -53,5 +53,12 @@ C#. Ships as one `v1.2.0` tag after the v1.1.0 milestone closes.
 - Snapshot / replay support: serialise the full simulation state for save-load and rewind.
 - Source generators for stat / status / reaction key constants (no more magic strings).
 - Optional Unity Editor inspector for `EffectioWorldBehaviour` showing live status / modifier breakdown.
+- **Lifecycle polymorphism for `IEffect`** (v2.0 candidate, breaking).
+Replaces the `EffectType` enum + multi-place switches in `EffectsEngine`
+(`ApplyEffect`, `Tick`, `ProcessPendingTicks`, `RemoveEffect`) with one
+`IEffectLifecycle` implementation per variant (Instant, Timed, Periodic,
+Aura, Triggered). Adding a new effect kind becomes one new class instead
+of editing four switch statements. Breaking because `IEffect` gains a
+`Lifecycle` member.
 
 
