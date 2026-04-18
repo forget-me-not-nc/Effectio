@@ -51,11 +51,20 @@ namespace Effectio.Builders
 
         /// <summary>
         /// Requires the entity to have at least <paramref name="minStacks"/> stacks of
-        /// <paramref name="statusKey"/> for this reaction to match. Combined with any
-        /// <see cref="RequireStatus(string)"/> / <see cref="RequireTag(string)"/> calls
-        /// (all must be satisfied). Default behaviour without this call is "any stack
-        /// count is fine" (presence-only check via <see cref="RequireStatus(string)"/>).
+        /// <paramref name="statusKey"/> for this reaction to match. Combines with
+        /// <see cref="RequireStatus(string)"/> calls into an AND-group: every
+        /// required status key must be present and every required stack threshold
+        /// must be met. <see cref="RequireTag(string)"/> calls remain an OR-fallback
+        /// (matched only if the status/stack AND-group does not succeed) - this is the
+        /// v1.0 matching shape, preserved for compatibility. Default behaviour without
+        /// any <c>RequireStacks</c> call is "any stack count is fine" (presence-only
+        /// check via <see cref="RequireStatus(string)"/>).
         /// </summary>
+        /// <remarks>
+        /// <c>RequireStacks(key, N)</c> implies presence of <paramref name="statusKey"/>
+        /// (any count >= 1 means the status is present), so callers do not also need to
+        /// add <c>RequireStatus(key)</c> for the same key.
+        /// </remarks>
         public ReactionBuilder RequireStacks(string statusKey, int minStacks)
         {
             _requiredStacks.Add(new StackRequirement(statusKey, minStacks));
@@ -71,13 +80,17 @@ namespace Effectio.Builders
         /// </summary>
         /// <example>
         /// <code>
-        /// // 3 stacks of Burning + Wet -> Inferno reaction
-        /// // Each fire consumes ONE Burning stack so the reaction can chain naturally
-        /// // (next tick: 2 Burning still &gt;= 1 -&gt; another Inferno, etc.)
+        /// // Burning + Wet -> Inferno reaction. Requires only 1 Burning stack to fire,
+        /// // consumes 1 stack per fire, persists the rest of its required statuses.
+        /// // Result: if entity has Burning x5 + Wet, the reaction fires up to
+        /// // MaxChainDepth times in one CheckReactions call (5 -> 4 -> 3 -> 2 -> 1),
+        /// // applying Inferno each time, until either Burning is exhausted or the
+        /// // chain depth limit is reached.
         /// ReactionBuilder.Create("Inferno")
-        ///     .RequireStacks("Burning", 3)
+        ///     .RequireStacks("Burning", 1)
         ///     .RequireStatus("Wet")
         ///     .ConsumesStacks("Burning", 1)
+        ///     .Persists() // do NOT remove Wet whole-status; chain depends on it surviving
         ///     .ApplyStatus("Inferno")
         ///     .Build();
         /// </code>

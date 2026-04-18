@@ -7,7 +7,7 @@ namespace Effectio.Statuses
     /// Optional opt-in extension of <see cref="IStatusEngine"/> exposing stack-level
     /// mutation operations and stack-change notifications. Status engines that do not
     /// implement this interface are presumed not to support partial-stack consumption;
-    /// consumers (e.g. <see cref="Reactions.ReactionEngine"/>'s stack-aware reactions)
+    /// consumers (e.g. <see cref="Effectio.Reactions.ReactionEngine"/>'s stack-aware reactions)
     /// skip stack-decrement work for them.
     /// </summary>
     /// <remarks>
@@ -47,8 +47,8 @@ namespace Effectio.Statuses
         /// </summary>
         /// <remarks>
         /// The reaction engine subscribes to this event (via
-        /// <see cref="Core.EffectioManager"/>) so that
-        /// <see cref="Reactions.IStackAwareReaction.RequiredStacks"/> thresholds
+        /// <see cref="Effectio.Core.EffectioManager"/>) so that
+        /// <see cref="Effectio.Reactions.IStackAwareReaction.RequiredStacks"/> thresholds
         /// re-evaluate as stacks accumulate. Without this event, a reaction
         /// requiring 3 stacks of Burning would never fire because v1.0's
         /// <see cref="IStatusEngine.OnStatusApplied"/> only fires on the first

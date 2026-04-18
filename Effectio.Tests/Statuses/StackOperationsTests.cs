@@ -6,7 +6,7 @@ namespace Effectio.Tests.Statuses
 {
     /// <summary>
     /// Coverage for the v1.1 <see cref="IStackOperations"/> surface
-    /// (<see cref="StatusEngine.RemoveStacks"/> — partial-stack decrement).
+    /// (<see cref="StatusEngine.RemoveStacks"/> - partial-stack decrement).
     /// </summary>
     [TestClass]
     public class StackOperationsTests

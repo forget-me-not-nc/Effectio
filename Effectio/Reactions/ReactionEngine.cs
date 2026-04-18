@@ -152,8 +152,10 @@ namespace Effectio.Reactions
                         ExecuteResult(entity, results[r]);
 
                     // Queue per-key stack-decrement consumes (v1.1+, IStackAwareReaction only).
+                    // Defensive null-check: external IStackAwareReaction implementations
+                    // may return null instead of an empty array.
                     StackConsume[] stackConsumes = null;
-                    if (reaction is IStackAwareReaction stackAware && stackAware.StackConsumes.Length > 0)
+                    if (reaction is IStackAwareReaction stackAware && stackAware.StackConsumes != null && stackAware.StackConsumes.Length > 0)
                     {
                         stackConsumes = stackAware.StackConsumes;
                         for (int sc = 0; sc < stackConsumes.Length; sc++)
@@ -192,7 +194,21 @@ namespace Effectio.Reactions
                     }
                     else
                     {
-                        if (_logger.IsEnabled) _logger.Warning($"Stack-aware reaction tried to ConsumesStacks but the status engine does not implement IStackOperations.");
+                        if (_logger.IsEnabled)
+                        {
+                            // Build a human-readable list of the offending reaction keys.
+                            // Allocates inside the IsEnabled gate, so VoidLogger callers pay nothing.
+                            var sb = new System.Text.StringBuilder();
+                            for (int k = 0; k < _matchBuffer.Count; k++)
+                            {
+                                if (_matchBuffer[k] is IStackAwareReaction sa && sa.StackConsumes != null && sa.StackConsumes.Length > 0)
+                                {
+                                    if (sb.Length > 0) sb.Append(", ");
+                                    sb.Append('\'').Append(_matchBuffer[k].Key).Append('\'');
+                                }
+                            }
+                            _logger.Warning($"Stack-aware reaction(s) {sb} tried to consume stacks on entity '{entity.Id}', but the status engine does not implement IStackOperations.");
+                        }
                     }
                 }
 
