@@ -3,7 +3,6 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Effectio.Builders;
 using Effectio.Core;
 using Effectio.Effects;
-using Effectio.Reactions;
 using Effectio.Stats;
 using Effectio.Statuses;
 

@@ -63,7 +63,7 @@ namespace Effectio.Core
                 else
                 {
                     if (_logger.IsEnabled)
-                        _logger.Warning($"Reaction tried to apply unknown effect '{effectKey}'. Did you forget manager.EffectCatalog.RegisterEffect(...)?");
+                        _logger.Warning($"Reaction tried to apply unknown effect '{effectKey}'. Register it via EffectCatalog.RegisterEffect before the reaction fires.");
                 }
             };
         }
