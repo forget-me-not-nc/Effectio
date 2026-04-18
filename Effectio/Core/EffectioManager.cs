@@ -22,6 +22,14 @@ namespace Effectio.Core
         public IStatusEngine Statuses => _statusEngine;
         public IReactionEngine Reactions => _reactionEngine;
 
+        /// <summary>
+        /// Registry of <see cref="IEffect"/> definitions resolvable by key. Reactions
+        /// using <c>ReactionBuilder.ApplyEffect(string)</c> resolve through this catalog
+        /// at trigger time. Added in v1.1; the underlying engine implements both
+        /// <see cref="IEffectsEngine"/> and <see cref="IEffectCatalog"/>.
+        /// </summary>
+        public IEffectCatalog EffectCatalog => _effectsEngine;
+
         public EffectioManager(IEffectioLogger logger = null)
         {
             _logger = logger ?? VoidLogger.Instance;
@@ -41,6 +49,21 @@ namespace Effectio.Core
                     var stat = entity.GetStat(statKey);
                     stat.BaseValue += value;
                     stat.Recalculate();
+                }
+            };
+
+            // v1.1: resolve ApplyEffect(string) results through the effect catalog.
+            // Pre-v1.1 this delegate was unwired, silently dropping reaction-applied effects.
+            _reactionEngine.OnApplyEffect = (entity, effectKey) =>
+            {
+                if (_effectsEngine.TryGetEffect(effectKey, out var effect))
+                {
+                    _effectsEngine.ApplyEffect(entity, effect);
+                }
+                else
+                {
+                    if (_logger.IsEnabled)
+                        _logger.Warning($"Reaction tried to apply unknown effect '{effectKey}'. Register it via EffectCatalog.RegisterEffect before the reaction fires.");
                 }
             };
         }
