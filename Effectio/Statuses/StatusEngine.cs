@@ -5,7 +5,7 @@ using Effectio.Entities;
 
 namespace Effectio.Statuses
 {
-    public class StatusEngine : IStatusEngine
+    public class StatusEngine : IStatusEngine, IStackOperations
     {
         private readonly IEffectioLogger _logger;
 
@@ -141,6 +141,27 @@ namespace Effectio.Statuses
                     return data.Stacks;
             }
             return 0;
+        }
+
+        // -------- IStackOperations --------
+
+        public void RemoveStacks(IEffectioEntity entity, string statusKey, int count)
+        {
+            if (count <= 0) return;
+            if (!_activeStatuses.TryGetValue(entity.Id, out var entityStatuses)) return;
+            if (!entityStatuses.TryGetValue(statusKey, out var data)) return;
+
+            int newStacks = data.Stacks - count;
+            if (newStacks <= 0)
+            {
+                // Full removal - delegates to RemoveStatus so the entity-side
+                // HashSet, the engine-side dict and OnStatusRemoved all stay in sync.
+                RemoveStatus(entity, statusKey);
+                return;
+            }
+
+            data.Stacks = newStacks;
+            if (_logger.IsEnabled) _logger.Info($"Status '{statusKey}' on entity '{entity.Id}' decremented to {newStacks} stacks.");
         }
 
         public void Tick(float deltaTime)
