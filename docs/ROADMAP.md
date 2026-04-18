@@ -34,6 +34,7 @@ section lands.
 | 8 | **`Conditional` effect action.** `.WhenStatBelow(stat, value, then, else)` without writing a custom action. | Sugar for "heal if low HP, otherwise damage". | S |
 | 9 | **Stack-aware ticks.** `StatusBuilder.OnTick(effect).PerStack()` so `Bleeding x3` ticks 3 x -1 HP. | Companion to task #2; status-side counterpart. | S |
 | 10 | **README: registration-order rule + reaction priority.** Document the gotcha until task #3 ships. | Cheap, prevents foot-guns for early users. | XS |
+| 11 | **Comprehensive benchmark matrix.** Cross-product of {10, 50, 100, 500} entities x {10, 50, 100} stats x {10, 50, 100} effects x {10, 50, 100} reactions. Measure CPU time per `Tick`, total managed allocations, peak working set, and per-tick budget headroom (does processing complete inside a 16 ms / 60 Hz frame budget at each scale?). Output baseline numbers so future PRs catch perf regressions. | Today's benchmarks are per-engine micro-benches; we have no end-to-end tick budget data at realistic game scale. | L |
 
 ## v1.2.0 - "Authoring"
 

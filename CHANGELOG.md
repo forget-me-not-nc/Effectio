@@ -58,6 +58,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   numbers on a Coffee Lake i7-9700K, .NET 8: 100 reactions across 100 distinct
   priorities tick in ~12 us, matching 100 reactions all at default priority
   (i.e. priority is free at typical scale; 0 B allocated per call).
+- `ReactionEngine.CheckReactions` no longer allocates 40 B per call from
+  `HashSet<T>.ExceptWith(IEnumerable<T>)` boxing the chain-detection diff's
+  argument enumerator. Replaced with a manual `foreach` over the concrete
+  `HashSet<string>` (struct enumerator, zero box). Reference numbers: the
+  smallest realistic `CheckReactions` call (one matching reaction, two chain
+  passes) drops from 170 ns / 40 B to 148 ns / 0 B; the priority benchmark
+  matrix at 100 reactions also drops to 0 B per op across every shape.
+- New `Effectio.Benchmarks.ReactionAllocationDiagnostic` keeps three
+  baselines (`NoOp`, `EarlyExit`, `OneTrivialReaction`) as a permanent
+  regression guard against allocation creep in the engine's hot path.
 
 ## [1.0.0] - 2026-04-17
 

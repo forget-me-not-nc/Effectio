@@ -93,7 +93,14 @@ namespace Effectio.Reactions
                 // Detect new statuses for chain detection across passes.
                 _newStatusBuffer.Clear();
                 entity.CopyStatusKeysTo(_newStatusBuffer);
-                _newStatusBuffer.ExceptWith(_prevStatusBuffer);
+
+                // Manual element-by-element diff instead of HashSet.ExceptWith(IEnumerable<T>).
+                // ExceptWith takes IEnumerable<T> and forces foreach through the interface,
+                // which boxes the second HashSet's struct enumerator (~40 B per call).
+                // Iterating _prevStatusBuffer through its concrete HashSet<string> type
+                // here uses the struct enumerator directly: zero allocation.
+                foreach (var prevKey in _prevStatusBuffer)
+                    _newStatusBuffer.Remove(prevKey);
 
                 if (_newStatusBuffer.Count == 0)
                     break;
