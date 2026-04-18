@@ -8,6 +8,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Stack-aware reactions** via the new `IStackAwareReaction` interface and
+  the `ReactionBuilder.RequireStacks(string, int)` and
+  `ReactionBuilder.ConsumesStacks(string, int)` fluent methods. Reactions
+  can now gate on minimum stack counts (e.g. "fire only when Burning has
+  at least 3 stacks") and decrement specific stack counts on fire instead
+  of removing the whole status. Per-key stack consumes take precedence
+  over `ConsumesStatuses(true)`; keys not listed fall back to the v1.0
+  flag. Reactions that do not implement `IStackAwareReaction` behave
+  exactly as in v1.0. Roadmap task v1.1 #1.
+- **`IStackOperations` interface** exposing
+  `RemoveStacks(IEffectioEntity, string, int)` and the
+  `OnStatusStacked` event. Implemented by `StatusEngine` alongside
+  `IStatusEngine` (which is unchanged for binary compatibility).
+  `OnStatusStacked` fires whenever a status's stack counter changes
+  without the status being newly applied or fully removed - e.g. on
+  `ApplyStatus` against an existing status, or on a partial `RemoveStacks`.
+  Does NOT fire when `ApplyStatus` is called at `MaxStacks` (no counter change).
+- **Reaction-check on stack changes.** `EffectioManager` now subscribes to
+  `OnStatusStacked` so stack-aware reactions re-evaluate as stacks
+  accumulate. Stack-change notifications do NOT replay a status's
+  `OnApplyEffects` (those fire once per status birth, not per refresh).
 - **Effect catalog** via the new `IEffectCatalog` interface and
   `EffectioManager.EffectCatalog` property (`RegisterEffect(IEffect)`,
   `TryGetEffect(string, out IEffect)`, `RegisteredEffects`). The built-in
@@ -37,14 +58,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Backwards compatibility
 
-- v1.0 source and binary surfaces are preserved. `IReaction`, `IEffectsEngine`
-  and `IEffectioManager` are unchanged, so existing implementations compile
-  and load against v1.1 unmodified. New surfaces (`IPrioritizedReaction`,
-  `IEffectCatalog`, `EffectioManager.EffectCatalog`) are additive.
-  The v1.0 5-parameter `Reaction(...)` constructor is kept as a distinct
-  overload (it delegates to the new 6-parameter form with `priority: 0`),
-  so pre-built v1.0 consumers do not hit `MissingMethodException`.
-  Regression tests cover both paths.
+- v1.0 source and binary surfaces are preserved. `IReaction`, `IEffectsEngine`,
+  `IStatusEngine` and `IEffectioManager` are unchanged, so existing
+  implementations compile and load against v1.1 unmodified. New surfaces
+  (`IPrioritizedReaction`, `IStackAwareReaction`, `IEffectCatalog`,
+  `IStackOperations`, `EffectioManager.EffectCatalog`) are additive.
+  The v1.0 5-parameter `Reaction(...)` constructor and the v1.1-preview
+  6-parameter overload are both kept as distinct ctors (delegating to the
+  new 8-parameter form with empty stack arrays / priority 0), so pre-built
+  consumers do not hit `MissingMethodException`. Regression tests cover all
+  three ctor paths and external `IReaction` implementations.
+
+### Apply-spam contract
+
+- `IStatusEngine.ApplyStatus` is idempotent at `MaxStacks` (the counter
+  does not grow further) but still fires `OnStatusApplied` (when the
+  status is newly applied) or `OnStatusStacked` (when the counter
+  actually increments). It does NOT fire either event when called against
+  a status already at `MaxStacks` - the counter does not change in that
+  path; only the duration refreshes. **Callers should still debounce
+  their own application loops** - typical pattern: aura systems should
+  re-apply per `Tick(deltaTime)`, not per Update/frame. Calling
+  `ApplyStatus` 1000x against a not-yet-maxed status between ticks costs
+  1000x the reaction-check work. A v1.2 candidate adds an opt-in
+  per-tick debounce mode (see roadmap).
 
 ### Performance
 

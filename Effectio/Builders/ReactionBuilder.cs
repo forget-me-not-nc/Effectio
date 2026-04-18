@@ -14,6 +14,8 @@ namespace Effectio.Builders
         private bool _consumesStatuses = true;
         private readonly List<IReactionResult> _results = new List<IReactionResult>();
         private int _priority = 0;
+        private readonly List<StackRequirement> _requiredStacks = new List<StackRequirement>();
+        private readonly List<StackConsume> _stackConsumes = new List<StackConsume>();
 
         public ReactionBuilder(string key)
         {
@@ -46,6 +48,58 @@ namespace Effectio.Builders
 
         public ReactionBuilder ConsumesStatuses(bool value = true) { _consumesStatuses = value; return this; }
         public ReactionBuilder Persists() { _consumesStatuses = false; return this; }
+
+        /// <summary>
+        /// Requires the entity to have at least <paramref name="minStacks"/> stacks of
+        /// <paramref name="statusKey"/> for this reaction to match. Combines with
+        /// <see cref="RequireStatus(string)"/> calls into an AND-group: every
+        /// required status key must be present and every required stack threshold
+        /// must be met. <see cref="RequireTag(string)"/> calls remain an OR-fallback
+        /// (matched only if the status/stack AND-group does not succeed) - this is the
+        /// v1.0 matching shape, preserved for compatibility. Default behaviour without
+        /// any <c>RequireStacks</c> call is "any stack count is fine" (presence-only
+        /// check via <see cref="RequireStatus(string)"/>).
+        /// </summary>
+        /// <remarks>
+        /// <c>RequireStacks(key, N)</c> implies presence of <paramref name="statusKey"/>
+        /// (any count >= 1 means the status is present), so callers do not also need to
+        /// add <c>RequireStatus(key)</c> for the same key.
+        /// </remarks>
+        public ReactionBuilder RequireStacks(string statusKey, int minStacks)
+        {
+            _requiredStacks.Add(new StackRequirement(statusKey, minStacks));
+            return this;
+        }
+
+        /// <summary>
+        /// On fire, decrement <paramref name="statusKey"/>'s stacks by
+        /// <paramref name="count"/> instead of removing the whole status.
+        /// If the resulting count would be &lt;= 0 the status is removed entirely.
+        /// Per-key stack consumes take precedence over <see cref="ConsumesStatuses(bool)"/>
+        /// for the keys they cover; keys not listed here fall back to that flag.
+        /// </summary>
+        /// <example>
+        /// <code>
+        /// // Burning + Wet -> Inferno reaction. Requires only 1 Burning stack to fire,
+        /// // consumes 1 stack per fire, persists the rest of its required statuses.
+        /// // Result: if entity has Burning x5 + Wet, the reaction fires up to
+        /// // MaxChainDepth times in one CheckReactions call (5 -> 4 -> 3 -> 2 -> 1),
+        /// // applying Inferno each time, until either Burning is exhausted or the
+        /// // chain depth limit is reached.
+        /// ReactionBuilder.Create("Inferno")
+        ///     .RequireStacks("Burning", 1)
+        ///     .RequireStatus("Wet")
+        ///     .ConsumesStacks("Burning", 1)
+        ///     .Persists() // do NOT remove Wet whole-status; chain depends on it surviving
+        ///     .ApplyStatus("Inferno")
+        ///     .Build();
+        /// </code>
+        /// </example>
+        public ReactionBuilder ConsumesStacks(string statusKey, int count)
+        {
+            _stackConsumes.Add(new StackConsume(statusKey, count));
+            return this;
+        }
 
         public ReactionBuilder ApplyStatus(string statusKey)
         {
@@ -90,6 +144,8 @@ namespace Effectio.Builders
             _requiredTags.ToArray(),
             _consumesStatuses,
             _results.ToArray(),
-            _priority);
+            _priority,
+            _requiredStacks.Count > 0 ? _requiredStacks.ToArray() : null,
+            _stackConsumes.Count > 0 ? _stackConsumes.ToArray() : null);
     }
 }

@@ -44,6 +44,10 @@ namespace Effectio.Reactions
         private readonly HashSet<string> _newStatusBuffer = new HashSet<string>();
         private readonly HashSet<string> _entityTagsBuffer = new HashSet<string>();
         private readonly HashSet<string> _statusSnapshotBuffer = new HashSet<string>();
+        // v1.1: queue of per-key stack decrements for the current tier.
+        // Drained alongside _toRemoveBuffer post-firing-loop so the next-lower tier
+        // sees consistent post-consume state.
+        private readonly List<StackConsume> _stackConsumeBuffer = new List<StackConsume>();
 
         public void RegisterReaction(IReaction reaction)
         {
@@ -132,6 +136,7 @@ namespace Effectio.Reactions
 
                 _matchBuffer.Clear();
                 _toRemoveBuffer.Clear();
+                _stackConsumeBuffer.Clear();
 
                 // Collect satisfied reactions for this tier.
                 int j = i;
@@ -153,17 +158,68 @@ namespace Effectio.Reactions
                     for (int r = 0; r < results.Length; r++)
                         ExecuteResult(entity, results[r]);
 
+                    // Queue per-key stack-decrement consumes (v1.1+, IStackAwareReaction only).
+                    // Defensive null-check: external IStackAwareReaction implementations
+                    // may return null instead of an empty array.
+                    StackConsume[] stackConsumes = null;
+                    if (reaction is IStackAwareReaction stackAware && stackAware.StackConsumes != null && stackAware.StackConsumes.Length > 0)
+                    {
+                        stackConsumes = stackAware.StackConsumes;
+                        for (int sc = 0; sc < stackConsumes.Length; sc++)
+                            _stackConsumeBuffer.Add(stackConsumes[sc]);
+                    }
+
+                    // Queue whole-status consumes (v1.0 ConsumesStatuses flag), EXCLUDING any
+                    // keys that the reaction's StackConsumes already targets - per-key
+                    // stack consume wins for those keys.
                     if (reaction.ConsumesStatuses)
                     {
                         var keys = reaction.RequiredStatusKeys;
                         for (int k2 = 0; k2 < keys.Length; k2++)
+                        {
+                            if (stackConsumes != null && KeyHasStackConsume(stackConsumes, keys[k2]))
+                                continue;
                             _toRemoveBuffer.Add(keys[k2]);
+                        }
                     }
 
                     OnReactionTriggered?.Invoke(entity, reaction);
                 }
 
-                // Apply consumes for this tier so the next-lower tier sees post-consume state.
+                // Apply stack decrements for this tier (only if the status engine
+                // supports IStackOperations - external implementations that don't
+                // are warn-skipped, so stack-aware reactions degrade to "consume nothing").
+                if (_stackConsumeBuffer.Count > 0)
+                {
+                    if (_statusEngine is IStackOperations ops)
+                    {
+                        for (int s = 0; s < _stackConsumeBuffer.Count; s++)
+                        {
+                            var sc = _stackConsumeBuffer[s];
+                            ops.RemoveStacks(entity, sc.StatusKey, sc.Count);
+                        }
+                    }
+                    else
+                    {
+                        if (_logger.IsEnabled)
+                        {
+                            // Build a human-readable list of the offending reaction keys.
+                            // Allocates inside the IsEnabled gate, so VoidLogger callers pay nothing.
+                            var sb = new System.Text.StringBuilder();
+                            for (int k = 0; k < _matchBuffer.Count; k++)
+                            {
+                                if (_matchBuffer[k] is IStackAwareReaction sa && sa.StackConsumes != null && sa.StackConsumes.Length > 0)
+                                {
+                                    if (sb.Length > 0) sb.Append(", ");
+                                    sb.Append('\'').Append(_matchBuffer[k].Key).Append('\'');
+                                }
+                            }
+                            _logger.Warning($"Stack-aware reaction(s) {sb} tried to consume stacks on entity '{entity.Id}', but the status engine does not implement IStackOperations.");
+                        }
+                    }
+                }
+
+                // Apply whole-status consumes for this tier so the next-lower tier sees post-consume state.
                 foreach (var statusKey in _toRemoveBuffer)
                     _statusEngine.RemoveStatus(entity, statusKey);
 
@@ -173,24 +229,60 @@ namespace Effectio.Reactions
             return anyFired;
         }
 
+        /// <summary>
+        /// Linear-scan check: does <paramref name="consumes"/> contain an entry
+        /// targeting <paramref name="statusKey"/>? Used to suppress whole-status
+        /// removal when a per-key stack consume already covers the same key.
+        /// Both arrays are typically very small (1-3 entries), so O(N) is fine.
+        /// </summary>
+        private static bool KeyHasStackConsume(StackConsume[] consumes, string statusKey)
+        {
+            for (int i = 0; i < consumes.Length; i++)
+            {
+                if (consumes[i].StatusKey == statusKey) return true;
+            }
+            return false;
+        }
+
         private bool IsReactionSatisfied(IEffectioEntity entity, IReaction reaction)
         {
-            // Check by status keys
-            if (reaction.RequiredStatusKeys.Length > 0)
+            // Pull stack requirements if reaction opted into IStackAwareReaction.
+            // Reactions that don't implement it have no stack constraints (v1.0 behaviour).
+            StackRequirement[] stackReqs = (reaction is IStackAwareReaction sar)
+                ? sar.RequiredStacks
+                : null;
+            bool hasStackReqs = stackReqs != null && stackReqs.Length > 0;
+
+            // Status keys + stacks are an AND-group (all must be satisfied for this branch
+            // to succeed). RequireStacks(key, N) implies presence of `key`, so a caller
+            // does not also need RequireStatus(key) - the stack check is sufficient.
+            bool hasStatusKeys = reaction.RequiredStatusKeys.Length > 0;
+            if (hasStatusKeys || hasStackReqs)
             {
-                bool allPresent = true;
-                foreach (var key in reaction.RequiredStatusKeys)
+                bool allMatch = true;
+                if (hasStatusKeys)
                 {
-                    if (!entity.HasStatus(key))
+                    var keys = reaction.RequiredStatusKeys;
+                    for (int i = 0; i < keys.Length; i++)
                     {
-                        allPresent = false;
-                        break;
+                        if (!entity.HasStatus(keys[i])) { allMatch = false; break; }
                     }
                 }
-                if (allPresent) return true;
+                if (allMatch && hasStackReqs)
+                {
+                    for (int i = 0; i < stackReqs.Length; i++)
+                    {
+                        if (_statusEngine.GetStacks(entity, stackReqs[i].StatusKey) < stackReqs[i].MinStacks)
+                        {
+                            allMatch = false;
+                            break;
+                        }
+                    }
+                }
+                if (allMatch) return true;
             }
 
-            // Check by tags
+            // Tag fallback (v1.0 OR-alternative when status/stack group is unsatisfied).
             if (reaction.RequiredTags.Length > 0)
             {
                 return AreTagsSatisfied(entity, reaction.RequiredTags);

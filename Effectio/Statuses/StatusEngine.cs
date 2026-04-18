@@ -5,7 +5,7 @@ using Effectio.Entities;
 
 namespace Effectio.Statuses
 {
-    public class StatusEngine : IStatusEngine
+    public class StatusEngine : IStatusEngine, IStackOperations
     {
         private readonly IEffectioLogger _logger;
 
@@ -24,6 +24,14 @@ namespace Effectio.Statuses
         public event Action<IEffectioEntity, string> OnStatusRemoved;
         public event Action<IEffectioEntity, string> OnStatusExpired;
         public event Action<IEffectioEntity, string> OnStatusBlocked;
+
+        // v1.1: fires when a status's stack counter changes (existing status
+        // application incremented stacks, or RemoveStacks performed a partial
+        // decrement). Does NOT fire on first application (use OnStatusApplied)
+        // or full removal (use OnStatusRemoved), and does NOT fire when
+        // ApplyStatus is called at MaxStacks (no counter change). Exposed via
+        // IStackOperations.OnStatusStacked.
+        public event Action<IEffectioEntity, string> OnStatusStacked;
 
         public StatusEngine(IEffectioLogger logger = null)
         {
@@ -94,6 +102,8 @@ namespace Effectio.Statuses
                 if (existing.Stacks < definition.MaxStacks)
                 {
                     existing.Stacks++;
+                    if (_logger.IsEnabled) _logger.Info($"Status '{statusKey}' on entity '{entity.Id}' incremented to {existing.Stacks} stacks.");
+                    OnStatusStacked?.Invoke(entity, statusKey);
                 }
                 // Refresh duration
                 existing.RemainingDuration = definition.Duration;
@@ -141,6 +151,28 @@ namespace Effectio.Statuses
                     return data.Stacks;
             }
             return 0;
+        }
+
+        // -------- IStackOperations --------
+
+        public void RemoveStacks(IEffectioEntity entity, string statusKey, int count)
+        {
+            if (count <= 0) return;
+            if (!_activeStatuses.TryGetValue(entity.Id, out var entityStatuses)) return;
+            if (!entityStatuses.TryGetValue(statusKey, out var data)) return;
+
+            int newStacks = data.Stacks - count;
+            if (newStacks <= 0)
+            {
+                // Full removal - delegates to RemoveStatus so the entity-side
+                // HashSet, the engine-side dict and OnStatusRemoved all stay in sync.
+                RemoveStatus(entity, statusKey);
+                return;
+            }
+
+            data.Stacks = newStacks;
+            if (_logger.IsEnabled) _logger.Info($"Status '{statusKey}' on entity '{entity.Id}' decremented to {newStacks} stacks.");
+            OnStatusStacked?.Invoke(entity, statusKey);
         }
 
         public void Tick(float deltaTime)
