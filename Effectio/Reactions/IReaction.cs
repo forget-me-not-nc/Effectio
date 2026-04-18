@@ -62,5 +62,69 @@ namespace Effectio.Reactions
     {
         int Priority { get; }
     }
+
+    /// <summary>
+    /// Minimum stack count of a particular status that a stack-aware reaction requires
+    /// to fire. Used by <see cref="IStackAwareReaction.RequiredStacks"/>.
+    /// </summary>
+    public readonly struct StackRequirement
+    {
+        public readonly string StatusKey;
+        public readonly int MinStacks;
+
+        public StackRequirement(string statusKey, int minStacks)
+        {
+            StatusKey = statusKey;
+            MinStacks = minStacks;
+        }
+    }
+
+    /// <summary>
+    /// Stack-decrement instruction applied when a stack-aware reaction fires.
+    /// <see cref="Count"/> stacks are removed from <see cref="StatusKey"/>; if the
+    /// remaining count would reach 0 the status is removed entirely. Per-key
+    /// stack consumes take precedence over <see cref="IReaction.ConsumesStatuses"/>
+    /// for keys they cover; keys not listed here fall through to the v1.0 flag.
+    /// </summary>
+    /// <remarks>
+    /// v1.1 semantics: decrements the combined stack counter by <see cref="Count"/>.
+    /// If a future release distinguishes individual stacks (each with its own
+    /// expiration), the default refinement will be "remove the <see cref="Count"/>
+    /// oldest stacks". Existing callers will continue to compile; behaviour for
+    /// equal-age stacks will become deterministic at that point.
+    /// </remarks>
+    public readonly struct StackConsume
+    {
+        public readonly string StatusKey;
+        public readonly int Count;
+
+        public StackConsume(string statusKey, int count)
+        {
+            StatusKey = statusKey;
+            Count = count;
+        }
+    }
+
+    /// <summary>
+    /// Optional opt-in extension of <see cref="IReaction"/> for reactions that gate
+    /// on minimum stack counts and / or decrement stacks (rather than removing whole
+    /// statuses) when they fire. Reactions that do NOT implement this interface
+    /// behave exactly as in v1.0 / early v1.1 - their match is decided purely by
+    /// <see cref="IReaction.RequiredStatusKeys"/> and <see cref="IReaction.RequiredTags"/>,
+    /// and consumption is controlled solely by <see cref="IReaction.ConsumesStatuses"/>.
+    /// </summary>
+    /// <remarks>
+    /// Kept as a separate interface (rather than added to <see cref="IReaction"/>) to
+    /// preserve binary compatibility for any v1.0 consumer that implemented
+    /// <see cref="IReaction"/> directly.
+    /// </remarks>
+    public interface IStackAwareReaction : IReaction
+    {
+        /// <summary>Minimum stack counts required for this reaction to match. Empty array if none.</summary>
+        StackRequirement[] RequiredStacks { get; }
+
+        /// <summary>Per-key stack-decrement instructions applied when the reaction fires. Empty array if none.</summary>
+        StackConsume[] StackConsumes { get; }
+    }
 }
 

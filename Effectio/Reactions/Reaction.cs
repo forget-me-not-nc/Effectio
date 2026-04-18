@@ -99,7 +99,7 @@ namespace Effectio.Reactions
         public virtual void Execute(in ReactionResultContext ctx) { }
     }
 
-    public class Reaction : IPrioritizedReaction
+    public class Reaction : IPrioritizedReaction, IStackAwareReaction
     {
         public string Key { get; }
         public string[] RequiredStatusKeys { get; }
@@ -107,13 +107,15 @@ namespace Effectio.Reactions
         public bool ConsumesStatuses { get; }
         public IReactionResult[] Results { get; }
         public int Priority { get; }
+        public StackRequirement[] RequiredStacks { get; }
+        public StackConsume[] StackConsumes { get; }
 
         /// <summary>
         /// v1.0-compatible constructor. Kept as a distinct overload (not merged into the
         /// 6-parameter form via an optional argument) so the original IL method signature
         /// still exists; pre-built v1.0 consumers calling this ctor continue to resolve
         /// it without a <c>MissingMethodException</c>. New callers should prefer the
-        /// 6-parameter overload (or <c>ReactionBuilder.Priority(int)</c>).
+        /// 8-parameter overload (or use <see cref="Effectio.Builders.ReactionBuilder"/>).
         /// </summary>
         public Reaction(
             string key,
@@ -125,7 +127,11 @@ namespace Effectio.Reactions
         {
         }
 
-        /// <summary>v1.1 constructor adding the <paramref name="priority"/> tier.</summary>
+        /// <summary>
+        /// v1.1 constructor adding the <paramref name="priority"/> tier. Kept as a distinct
+        /// 6-parameter overload so binary consumers compiled against the early-v1.1
+        /// preview signature continue to resolve it.
+        /// </summary>
         public Reaction(
             string key,
             string[] requiredStatusKeys,
@@ -133,6 +139,27 @@ namespace Effectio.Reactions
             bool consumesStatuses,
             IReactionResult[] results,
             int priority)
+            : this(key, requiredStatusKeys, requiredTags, consumesStatuses, results, priority,
+                   requiredStacks: null, stackConsumes: null)
+        {
+        }
+
+        /// <summary>
+        /// v1.1 constructor adding stack-aware fields (<paramref name="requiredStacks"/>
+        /// and <paramref name="stackConsumes"/>). Reactions whose <c>requiredStacks</c>
+        /// is empty match purely on <see cref="RequiredStatusKeys"/> / <see cref="RequiredTags"/>.
+        /// Reactions whose <c>stackConsumes</c> is empty fall back to <see cref="ConsumesStatuses"/>
+        /// for whole-status removal on fire.
+        /// </summary>
+        public Reaction(
+            string key,
+            string[] requiredStatusKeys,
+            string[] requiredTags,
+            bool consumesStatuses,
+            IReactionResult[] results,
+            int priority,
+            StackRequirement[] requiredStacks,
+            StackConsume[] stackConsumes)
         {
             Key = key;
             RequiredStatusKeys = requiredStatusKeys ?? new string[0];
@@ -140,6 +167,8 @@ namespace Effectio.Reactions
             ConsumesStatuses = consumesStatuses;
             Results = results ?? new IReactionResult[0];
             Priority = priority;
+            RequiredStacks = requiredStacks ?? new StackRequirement[0];
+            StackConsumes = stackConsumes ?? new StackConsume[0];
         }
     }
 }

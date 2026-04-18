@@ -14,6 +14,8 @@ namespace Effectio.Builders
         private bool _consumesStatuses = true;
         private readonly List<IReactionResult> _results = new List<IReactionResult>();
         private int _priority = 0;
+        private readonly List<StackRequirement> _requiredStacks = new List<StackRequirement>();
+        private readonly List<StackConsume> _stackConsumes = new List<StackConsume>();
 
         public ReactionBuilder(string key)
         {
@@ -46,6 +48,45 @@ namespace Effectio.Builders
 
         public ReactionBuilder ConsumesStatuses(bool value = true) { _consumesStatuses = value; return this; }
         public ReactionBuilder Persists() { _consumesStatuses = false; return this; }
+
+        /// <summary>
+        /// Requires the entity to have at least <paramref name="minStacks"/> stacks of
+        /// <paramref name="statusKey"/> for this reaction to match. Combined with any
+        /// <see cref="RequireStatus(string)"/> / <see cref="RequireTag(string)"/> calls
+        /// (all must be satisfied). Default behaviour without this call is "any stack
+        /// count is fine" (presence-only check via <see cref="RequireStatus(string)"/>).
+        /// </summary>
+        public ReactionBuilder RequireStacks(string statusKey, int minStacks)
+        {
+            _requiredStacks.Add(new StackRequirement(statusKey, minStacks));
+            return this;
+        }
+
+        /// <summary>
+        /// On fire, decrement <paramref name="statusKey"/>'s stacks by
+        /// <paramref name="count"/> instead of removing the whole status.
+        /// If the resulting count would be &lt;= 0 the status is removed entirely.
+        /// Per-key stack consumes take precedence over <see cref="ConsumesStatuses(bool)"/>
+        /// for the keys they cover; keys not listed here fall back to that flag.
+        /// </summary>
+        /// <example>
+        /// <code>
+        /// // 3 stacks of Burning + Wet -> Inferno reaction
+        /// // Each fire consumes ONE Burning stack so the reaction can chain naturally
+        /// // (next tick: 2 Burning still &gt;= 1 -&gt; another Inferno, etc.)
+        /// ReactionBuilder.Create("Inferno")
+        ///     .RequireStacks("Burning", 3)
+        ///     .RequireStatus("Wet")
+        ///     .ConsumesStacks("Burning", 1)
+        ///     .ApplyStatus("Inferno")
+        ///     .Build();
+        /// </code>
+        /// </example>
+        public ReactionBuilder ConsumesStacks(string statusKey, int count)
+        {
+            _stackConsumes.Add(new StackConsume(statusKey, count));
+            return this;
+        }
 
         public ReactionBuilder ApplyStatus(string statusKey)
         {
@@ -90,6 +131,8 @@ namespace Effectio.Builders
             _requiredTags.ToArray(),
             _consumesStatuses,
             _results.ToArray(),
-            _priority);
+            _priority,
+            _requiredStacks.Count > 0 ? _requiredStacks.ToArray() : null,
+            _stackConsumes.Count > 0 ? _stackConsumes.ToArray() : null);
     }
 }
