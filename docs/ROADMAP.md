@@ -24,8 +24,8 @@ section lands.
 
 | # | Task | Why | Size |
 |---|---|---|---|
-| 1 | **Stack-aware reactions.** `RequireStacks(key, min)`, `ConsumesStacks(key, count)`, `ScaleResultsByMinStackCount()`. | Lets "3 stacks of Burning -> Inferno" be expressible declaratively. | M |
-| 2 | **Stack-scaled effect actions.** `EffectBuilder.AdjustStat("Health", -5f).PerStackOf("Burning")`. | Removes the need to write a custom `IEffectAction` for `Bleeding x3 = -3 HP/s`. | S |
+| 1 | ~~**Stack-aware reactions.** `RequireStacks(key, min)`, `ConsumesStacks(key, count)`, `ScaleResultsByMinStackCount()`.~~ **Shipped trimmed:** `RequireStacks(key, min)` and `ConsumesStacks(key, count)` only. `ScaleResultsByMinStackCount` deferred into v1.2 task #4 ("Scaling and callbacks design") - the right shape is a richer action / callback vocabulary, not a numeric multiplier on existing results. | Lets "3 stacks of Burning -> Inferno" be expressible declaratively. Stack-scaled damage is achievable today via a custom `IReactionResult` that reads `ctx.StatusEngine.GetStacks(...)`. | M |
+| 2 | ~~**Stack-scaled effect actions.** `EffectBuilder.AdjustStat("Health", -5f).PerStackOf("Burning")`.~~ **Deferred to v1.2 #4** (same scaling-and-callbacks rethink). | Removes the need to write a custom `IEffectAction` for `Bleeding x3 = -3 HP/s`. | S |
 | 3 | **Reaction priority.** Explicit `.Priority(int)` so registration order does not silently determine which reaction wins. | Today the 5-condition Apocalypse only fires if registered before its 2-condition subsets. Easy to get wrong. | S |
 | 4 | **Effect catalog + wire `OnApplyEffect`.** `manager.Effects.RegisterEffect(IEffect)`; `ReactionBuilder.ApplyEffect(string)` resolves through the catalog. | Closes the bug found designing Overload (`ApplyEffect(string)` is currently a no-op from reactions). | M |
 | 5 | **`entity.GetStatusStackCount(key)` shortcut.** | Today consumers have to reach into `manager.Statuses.GetStacks(...)`. Pure ergonomics. | XS |
@@ -45,6 +45,8 @@ C#. Ships as one `v1.2.0` tag after the v1.1.0 milestone closes.
 | 1 | **`Effectio.Serialization.Json`** package: DTO records + `System.Text.Json` loader for effects, statuses, reactions. | Lets games author content as JSON without dragging the dependency into the core. | L |
 | 2 | **`Effectio.Unity`** package: `EffectioWorldBehaviour`, `CharacterStatsBehaviour`, `ScriptableObject` wrappers mirroring the DTOs. | Pulls the boilerplate out of every Unity consumer's project. | L |
 | 3 | **`Effectio.Unity` sample:** convert `samples/UnityDemo` to use the ScriptableObject authoring path. | Validates the authoring story end-to-end. | M |
+| 4 | **Scaling and callbacks design.** Replaces deferred v1.1 #1 `ScaleResultsByMinStackCount` and v1.1 #2 `PerStackOf`. Design a coherent extensibility surface for "on satisfied condition, do X" - user callbacks, custom result/action types that can introspect the trigger context (stack counts, matched statuses, etc.), threshold hooks. | Numeric-multiplier scaling is too narrow. The honest shape is a richer action vocabulary, but it needs design work that did not fit in the v1.1 schedule. | L |
+| 5 | **Optional per-tick `OnStatusApplied` / `OnStatusStacked` debouncing.** A configurable mode where each event fires at most once per (entity, statusKey) per `Tick`. Off by default to preserve current semantics. | Shields callers from accidental tight-loop application costs (e.g. an aura applying status every Update instead of every Tick). Needs a clean tick-boundary definition. | M |
 
 ## Backlog (no milestone yet)
 

@@ -41,6 +41,12 @@ namespace Effectio.Core
             // Wire up: when a status is applied, check reactions
             _statusEngine.OnStatusApplied += OnStatusApplied;
 
+            // v1.1: stack count changes also trigger reaction checks so
+            // IStackAwareReaction.RequiredStacks thresholds re-evaluate as
+            // stacks accumulate. Does NOT replay OnApplyEffects (those fire
+            // once on status birth, not on stack changes).
+            _statusEngine.OnStatusStacked += OnStatusStacked;
+
             // Wire up reaction engine callbacks for stat adjustments and effect application
             _reactionEngine.OnAdjustStat = (entity, statKey, value) =>
             {
@@ -173,6 +179,19 @@ namespace Effectio.Core
 
             // Check for reactions whenever a status is applied
             // Guard against re-entrancy: ReactionEngine handles chaining internally
+            CheckReactionsGuarded(entity);
+        }
+
+        private void OnStatusStacked(IEffectioEntity entity, string statusKey)
+        {
+            // Stack increments do NOT replay OnApplyEffects (those are once-per-birth).
+            // They DO need a reaction re-check so stack-aware reactions can fire as
+            // thresholds get crossed.
+            CheckReactionsGuarded(entity);
+        }
+
+        private void CheckReactionsGuarded(IEffectioEntity entity)
+        {
             if (!_isCheckingReactions)
             {
                 _isCheckingReactions = true;

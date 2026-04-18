@@ -1,13 +1,14 @@
+using System;
 using Effectio.Entities;
 
 namespace Effectio.Statuses
 {
     /// <summary>
     /// Optional opt-in extension of <see cref="IStatusEngine"/> exposing stack-level
-    /// mutation operations. Status engines that don't implement this interface are
-    /// presumed not to support partial-stack consumption; consumers (e.g.
-    /// <see cref="Reactions.ReactionEngine"/>'s stack-aware reactions) skip
-    /// stack-decrement work for them.
+    /// mutation operations and stack-change notifications. Status engines that do not
+    /// implement this interface are presumed not to support partial-stack consumption;
+    /// consumers (e.g. <see cref="Reactions.ReactionEngine"/>'s stack-aware reactions)
+    /// skip stack-decrement work for them.
     /// </summary>
     /// <remarks>
     /// Kept as a separate interface (rather than added to <see cref="IStatusEngine"/>)
@@ -29,9 +30,30 @@ namespace Effectio.Statuses
         /// <see cref="StatusEngine"/>. If a future release distinguishes
         /// individual stacks (each with its own expiration), the default
         /// refinement will be "remove the <paramref name="count"/> oldest stacks".
-        /// Partial decrements do NOT fire any event; only the full-removal
-        /// transition fires <see cref="IStatusEngine.OnStatusRemoved"/>.
+        /// Partial decrements do NOT fire <see cref="IStatusEngine.OnStatusRemoved"/>;
+        /// only the full-removal transition does. They DO fire
+        /// <see cref="OnStatusStacked"/> so consumers can react to the count change.
         /// </remarks>
         void RemoveStacks(IEffectioEntity entity, string statusKey, int count);
+
+        /// <summary>
+        /// Fires whenever a status's stack count changes WITHOUT the status
+        /// being newly applied or fully removed. Triggered both by
+        /// <see cref="IStatusEngine.ApplyStatus"/> when it increments an existing
+        /// status's stacks, and by <see cref="RemoveStacks"/> when it performs a
+        /// partial decrement. Does NOT fire when <see cref="IStatusEngine.ApplyStatus"/>
+        /// is called against a status already at its <c>MaxStacks</c> cap (the
+        /// counter does not change in that path - duration just refreshes).
+        /// </summary>
+        /// <remarks>
+        /// The reaction engine subscribes to this event (via
+        /// <see cref="Core.EffectioManager"/>) so that
+        /// <see cref="Reactions.IStackAwareReaction.RequiredStacks"/> thresholds
+        /// re-evaluate as stacks accumulate. Without this event, a reaction
+        /// requiring 3 stacks of Burning would never fire because v1.0's
+        /// <see cref="IStatusEngine.OnStatusApplied"/> only fires on the first
+        /// application of a status, not on subsequent stack increments.
+        /// </remarks>
+        event Action<IEffectioEntity, string> OnStatusStacked;
     }
 }

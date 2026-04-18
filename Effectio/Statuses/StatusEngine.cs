@@ -25,6 +25,14 @@ namespace Effectio.Statuses
         public event Action<IEffectioEntity, string> OnStatusExpired;
         public event Action<IEffectioEntity, string> OnStatusBlocked;
 
+        // v1.1: fires when a status's stack counter changes (existing status
+        // application incremented stacks, or RemoveStacks performed a partial
+        // decrement). Does NOT fire on first application (use OnStatusApplied)
+        // or full removal (use OnStatusRemoved), and does NOT fire when
+        // ApplyStatus is called at MaxStacks (no counter change). Exposed via
+        // IStackOperations.OnStatusStacked.
+        public event Action<IEffectioEntity, string> OnStatusStacked;
+
         public StatusEngine(IEffectioLogger logger = null)
         {
             _logger = logger ?? VoidLogger.Instance;
@@ -94,6 +102,8 @@ namespace Effectio.Statuses
                 if (existing.Stacks < definition.MaxStacks)
                 {
                     existing.Stacks++;
+                    if (_logger.IsEnabled) _logger.Info($"Status '{statusKey}' on entity '{entity.Id}' incremented to {existing.Stacks} stacks.");
+                    OnStatusStacked?.Invoke(entity, statusKey);
                 }
                 // Refresh duration
                 existing.RemainingDuration = definition.Duration;
@@ -162,6 +172,7 @@ namespace Effectio.Statuses
 
             data.Stacks = newStacks;
             if (_logger.IsEnabled) _logger.Info($"Status '{statusKey}' on entity '{entity.Id}' decremented to {newStacks} stacks.");
+            OnStatusStacked?.Invoke(entity, statusKey);
         }
 
         public void Tick(float deltaTime)
