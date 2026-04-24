@@ -79,7 +79,9 @@ namespace Effectio.Core
             if (_entities.ContainsKey(id))
                 throw new InvalidOperationException($"Entity '{id}' already exists.");
 
-            var entity = new EffectioEntity(id);
+            // v1.1: pass the status engine so entity.GetStatusStackCount(...) works
+            // without callers having to reach back through manager.Statuses.
+            var entity = new EffectioEntity(id, _statusEngine);
             _entities[id] = entity;
             _logger.Info($"Entity '{id}' created.");
             return entity;
