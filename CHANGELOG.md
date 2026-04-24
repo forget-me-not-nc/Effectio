@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **`StatusBuilder.OnRefresh(IEffect)`** + **`IStatus.OnRefreshEffects`** +
+  **`IStatusEngine.OnStatusRefreshed`** event. Effects fire every time
+  `ApplyStatus` is called against an entity that already has the status,
+  whether the stack counter increments or is already at `MaxStacks`.
+  Distinct from `IStackOperations.OnStatusStacked` (which fires only on
+  counter changes); `OnStatusRefreshed` fires on both stack-increment AND
+  at-max refresh paths because the combined `RemainingDuration` refreshes
+  in both. Does NOT fire on first application or on `RemoveStacks` partial
+  decrement. Useful for "stand-in-flame" patterns where each re-application
+  bursts damage. Roadmap task v1.1 #7.
 - **Stack-aware reactions** via the new `IStackAwareReaction` interface and
   the `ReactionBuilder.RequireStacks(string, int)` and
   `ReactionBuilder.ConsumesStacks(string, int)` fluent methods. Reactions
@@ -58,11 +68,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Backwards compatibility
 
-- v1.0 source and binary surfaces are preserved. `IReaction`, `IEffectsEngine`,
-  `IStatusEngine` and `IEffectioManager` are unchanged, so existing
-  implementations compile and load against v1.1 unmodified. New surfaces
-  (`IPrioritizedReaction`, `IStackAwareReaction`, `IEffectCatalog`,
-  `IStackOperations`, `EffectioManager.EffectCatalog`) are additive.
+- v1.0 source and binary surfaces are preserved at the `IReaction` /
+  `IEffectsEngine` / `IEffectioManager` level. `IStatusEngine` grows ONE new
+  event member in v1.1 (`OnStatusRefreshed`); this is technically a binary
+  break for any external implementation of `IStatusEngine`, but the realistic
+  v1.0 ecosystem of external `IStatusEngine` implementers is effectively
+  zero (engine plumbing, not user-extension surface). `IStatus` similarly
+  grows one new member (`OnRefreshEffects`); external `IStatus`
+  implementations need to add the property (return `null` or `Array.Empty`
+  is fine - the manager null-guards). The built-in `Status` class adds it
+  transparently and keeps its v1.0 8-parameter ctor as a delegating overload.
+  Other new surfaces (`IPrioritizedReaction`, `IStackAwareReaction`,
+  `IEffectCatalog`, `IStackOperations`, `EffectioManager.EffectCatalog`)
+  are pure additions on new opt-in interfaces.
   The v1.0 5-parameter `Reaction(...)` constructor and the v1.1-preview
   6-parameter overload are both kept as distinct ctors (delegating to the
   new 8-parameter form with empty stack arrays / priority 0), so pre-built

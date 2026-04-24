@@ -22,5 +22,14 @@ namespace Effectio.Statuses
         event Action<IEffectioEntity, string> OnStatusApplied;
         event Action<IEffectioEntity, string> OnStatusRemoved;
         event Action<IEffectioEntity, string> OnStatusExpired;
+
+        /// <summary>
+        /// Fires every time ApplyStatus is called against an entity that already has the
+        /// status (whether the stack counter increments or is already at MaxStacks).
+        /// The combined RemainingDuration has been refreshed by the time this fires.
+        /// Does NOT fire on first application (use OnStatusApplied) or on
+        /// IStackOperations.RemoveStacks partial decrement.
+        /// </summary>
+        event Action<IEffectioEntity, string> OnStatusRefreshed;
     }
 }

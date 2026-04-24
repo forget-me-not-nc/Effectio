@@ -17,6 +17,7 @@ namespace Effectio.Builders
         private readonly List<IEffect> _onApply = new List<IEffect>();
         private readonly List<IEffect> _onTick = new List<IEffect>();
         private readonly List<IEffect> _onRemove = new List<IEffect>();
+        private readonly List<IEffect> _onRefresh = new List<IEffect>();
 
         public StatusBuilder(string key)
         {
@@ -45,6 +46,20 @@ namespace Effectio.Builders
         public StatusBuilder OnRemove(IEffect effect) { _onRemove.Add(effect); return this; }
         public StatusBuilder OnRemove(EffectBuilder effect) { _onRemove.Add(effect.Build()); return this; }
 
+        /// <summary>
+        /// Fire <paramref name="effect"/> every time <c>ApplyStatus</c> is called against
+        /// an entity that already has this status (whether stacks increment or are at
+        /// <see cref="Stackable(int)"/> max). Useful for "stand-in-flame" patterns:
+        /// each re-application bursts a damage tick, regardless of whether the stack
+        /// counter actually moved. Does NOT fire on first application (use
+        /// <see cref="OnApply(IEffect)"/>) or on partial
+        /// <c>IStackOperations.RemoveStacks</c> decrement.
+        /// </summary>
+        public StatusBuilder OnRefresh(IEffect effect) { _onRefresh.Add(effect); return this; }
+
+        /// <summary>Convenience overload accepting an <see cref="EffectBuilder"/>.</summary>
+        public StatusBuilder OnRefresh(EffectBuilder effect) { _onRefresh.Add(effect.Build()); return this; }
+
         public IStatus Build() => new Status(
             _key,
             _tags.ToArray(),
@@ -53,6 +68,7 @@ namespace Effectio.Builders
             _onApply.ToArray(),
             _onTick.ToArray(),
             _onRemove.ToArray(),
-            _tickInterval);
+            _tickInterval,
+            _onRefresh.Count > 0 ? _onRefresh.ToArray() : null);
     }
 }

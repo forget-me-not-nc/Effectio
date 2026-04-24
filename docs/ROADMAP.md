@@ -30,7 +30,7 @@ section lands.
 | 4 | **Effect catalog + wire `OnApplyEffect`.** `manager.Effects.RegisterEffect(IEffect)`; `ReactionBuilder.ApplyEffect(string)` resolves through the catalog. | Closes the bug found designing Overload (`ApplyEffect(string)` is currently a no-op from reactions). | M |
 | 5 | **`entity.GetStatusStackCount(key)` shortcut.** | Today consumers have to reach into `manager.Statuses.GetStacks(...)`. Pure ergonomics. | XS |
 | 6 | **Per-stack expiration semantics: test + docs.** Decide whether stacks expire all-at-once or one-at-a-time, lock with tests, document. | Current behaviour is an implementation detail. | S |
-| 7 | **`StatusBuilder.OnRefresh(IEffect)`.** Fire an effect when a status is re-applied while still active. | Useful for "stacking refresh also ticks burst damage" patterns. | S |
+| 7 | ~~**`StatusBuilder.OnRefresh(IEffect)`.** Fire an effect when a status is re-applied while still active.~~ **Shipped:** `StatusBuilder.OnRefresh(IEffect)` + `IStatus.OnRefreshEffects` + `IStatusEngine.OnStatusRefreshed` event. Fires for both stack-increment AND at-MaxStacks paths (whenever `RemainingDuration` refreshes). Distinct from `OnStatusStacked` (which only fires on counter changes). | Useful for "stacking refresh also ticks burst damage" patterns. | S |
 | 8 | **`Conditional` effect action.** `.WhenStatBelow(stat, value, then, else)` without writing a custom action. | Sugar for "heal if low HP, otherwise damage". | S |
 | 9 | **Stack-aware ticks.** `StatusBuilder.OnTick(effect).PerStack()` so `Bleeding x3` ticks 3 x -1 HP. | Companion to task #2; status-side counterpart. | S |
 | 10 | **README: registration-order rule + reaction priority.** Document the gotcha until task #3 ships. | Cheap, prevents foot-guns for early users. | XS |

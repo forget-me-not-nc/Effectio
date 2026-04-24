@@ -47,6 +47,11 @@ namespace Effectio.Core
             // once on status birth, not on stack changes).
             _statusEngine.OnStatusStacked += OnStatusStacked;
 
+            // v1.1: status refreshes (re-application against existing status,
+            // whether stacks incremented or were already at MaxStacks) fire
+            // OnRefreshEffects from the status definition.
+            _statusEngine.OnStatusRefreshed += OnStatusRefreshed;
+
             // Wire up reaction engine callbacks for stat adjustments and effect application
             _reactionEngine.OnAdjustStat = (entity, statKey, value) =>
             {
@@ -188,6 +193,23 @@ namespace Effectio.Core
             // They DO need a reaction re-check so stack-aware reactions can fire as
             // thresholds get crossed.
             CheckReactionsGuarded(entity);
+        }
+
+        private void OnStatusRefreshed(IEffectioEntity entity, string statusKey)
+        {
+            // Apply the status's OnRefreshEffects (separate list from OnApplyEffects).
+            // Mirrors the OnStatusApplied wiring for the once-per-birth OnApplyEffects.
+            var definition = _statusEngine.GetStatusDefinition(statusKey);
+            if (definition?.OnRefreshEffects != null)
+            {
+                foreach (var effect in definition.OnRefreshEffects)
+                {
+                    _effectsEngine.ApplyEffect(entity, effect);
+                }
+            }
+            // No reaction re-check here. OnStatusStacked already triggers CheckReactions
+            // for stack-counter changes. At-MaxStacks refreshes do not change anything
+            // observable to a stack-aware reaction (counter unchanged, no new statuses).
         }
 
         private void CheckReactionsGuarded(IEffectioEntity entity)
