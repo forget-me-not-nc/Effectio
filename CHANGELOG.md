@@ -83,6 +83,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   1000x the reaction-check work. A v1.2 candidate adds an opt-in
   per-tick debounce mode (see roadmap).
 
+### Stack-expiration contract
+
+- All stacks of a status share **one combined `RemainingDuration`**.
+  Each successful `IStatusEngine.ApplyStatus` resets it to
+  `IStatus.Duration` (this is true even at `MaxStacks` - the counter
+  does not increment but the duration still refreshes).
+  `IStatusEngine.Tick` decrements the combined duration uniformly.
+  When the duration reaches zero, the entire status is removed and
+  `OnStatusExpired` fires **once**, not once per stack.
+- `IStackOperations.RemoveStacks` decrements the stack counter without
+  touching `RemainingDuration`; remaining stacks expire on the original
+  in-flight timer.
+- `IStatus.OnTickEffects` fire **once per tick per status**, regardless
+  of stack count. Per-stack tick scaling (`OnTick(...).PerStack()`) is
+  a v1.2 candidate.
+- `Duration = -1` means permanent. Such statuses never expire regardless
+  of stack count.
+- This contract is locked down by `StackExpirationTests` (6 tests).
+  A future v2 release may distinguish individual stacks (each with its
+  own expiration); the v1.x combined-counter behaviour will remain
+  selectable / opt-in. Roadmap task v1.1 #6.
+
 ### Performance
 
 - `ReactionEngine` now keeps `_reactions` sorted by priority on register (stable
