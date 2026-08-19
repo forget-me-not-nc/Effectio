@@ -44,6 +44,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   nobody could see. One stack per `Tick` call whatever the delta, matching the
   one-expiry-per-call rule the engine already follows everywhere else.
 
+- **`EffectActionContext.SourceStatusKey`** - the status an effect is running
+  on behalf of, or `null` when it was applied directly. Everything needed to
+  scale an action by stack count was already in the context; what was missing
+  was which key had caused this particular execution, so an action could only
+  ask about a status named in its own constructor - making a
+  scale-by-my-stacks action one class per status instead of one class. Carried
+  on the active-effect entry rather than passed at execution time, because a
+  periodic effect ticks long after whoever applied it has returned. Applied
+  through a new `EffectsEngine.ApplyEffect(entity, effect, sourceStatusKey)`
+  overload on the class rather than a new member on `IEffectsEngine`.
+
 - **`IRemainingDuration`** (`Effectio.Common`), implemented by both
   `StatusEngine` and `EffectsEngine`. `GetRemainingDuration(entity, key)`
   returns seconds left, `-1` for permanent (matching `IStatus.Duration`'s
@@ -108,6 +119,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   v1.0 behaviour.
 
 ### Fixed
+
+- **`IStatus.OnRemoveEffects` now fire when a status is removed deliberately,
+  not only when it expires.** The property has always been documented as
+  firing on "manual remove or expiration" and only ever did the second:
+  `EffectioManager` fired them from its expiration loop and never subscribed
+  to `OnStatusRemoved`. A status dispelled, cleansed, or dropped by a reaction
+  consuming its last stack skipped its own farewell entirely, so anything an
+  author put there to clean up after itself simply did not run. Expiration
+  still goes through the tick loop, so there is no path on which both fire.
 
 - **`IStat.BaseValue` is now held inside the stat's own `Min` / `Max`.**
   Previously only `CurrentValue` was clamped, so a base driven past a limit

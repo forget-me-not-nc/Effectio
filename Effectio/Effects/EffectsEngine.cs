@@ -52,9 +52,22 @@ namespace Effectio.Effects
 
         public void ApplyEffect(IEffectioEntity entity, IEffect effect)
         {
+            ApplyEffect(entity, effect, null);
+        }
+
+        /// <summary>
+        /// Applies an effect on behalf of a status, so its action can find out which status
+        /// it is running for through <see cref="Actions.EffectActionContext.SourceStatusKey"/>.
+        ///
+        /// An overload on the class rather than a member on <see cref="IEffectsEngine"/>: the
+        /// caller that needs it is the manager, and growing the interface would break every
+        /// external implementation for the sake of a parameter almost nobody passes.
+        /// </summary>
+        public void ApplyEffect(IEffectioEntity entity, IEffect effect, string sourceStatusKey)
+        {
             if (effect.EffectType == EffectType.Instant)
             {
-                ExecuteAction(entity, effect);
+                ExecuteAction(entity, effect, sourceStatusKey);
                 OnEffectApplied?.Invoke(entity, effect);
                 return;
             }
@@ -66,7 +79,9 @@ namespace Effectio.Effects
                 _activeEffects[entity.Id] = effects;
             }
 
-            var active = new ActiveEffect(effect);
+            // Remembered on the entry rather than passed at execution time, because a
+            // periodic effect's ticks happen long after whoever applied it has returned.
+            var active = new ActiveEffect(effect) { SourceStatusKey = sourceStatusKey };
             effects.Add(active);
 
             // Aura: apply immediately (will be undone on removal)
@@ -75,7 +90,7 @@ namespace Effectio.Effects
             // Triggered: wait for condition
             if (effect.EffectType == EffectType.Aura || effect.EffectType == EffectType.Timed)
             {
-                ExecuteAction(entity, effect);
+                ExecuteAction(entity, effect, sourceStatusKey);
             }
 
             OnEffectApplied?.Invoke(entity, effect);
@@ -129,7 +144,7 @@ namespace Effectio.Effects
 
                     // Aura effects undo their action on removal
                     if (effect.EffectType == EffectType.Aura)
-                        UndoAction(entity, effect);
+                        UndoAction(entity, effect, effects[i].SourceStatusKey);
 
                     effects.RemoveAt(i);
                     OnEffectRemoved?.Invoke(entity, effect);
@@ -190,7 +205,7 @@ namespace Effectio.Effects
                 if (active.PendingRemoval)
                 {
                     if (active.Effect.EffectType == EffectType.Aura)
-                        UndoAction(entity, active.Effect);
+                        UndoAction(entity, active.Effect, active.SourceStatusKey);
 
                     effects.RemoveAt(i);
                     OnEffectRemoved?.Invoke(entity, active.Effect);
@@ -202,7 +217,7 @@ namespace Effectio.Effects
                 if (active.PendingTick)
                 {
                     active.PendingTick = false;
-                    ExecuteAction(entity, active.Effect);
+                    ExecuteAction(entity, active.Effect, active.SourceStatusKey);
                     OnEffectTick?.Invoke(entity, active.Effect);
                 }
 
@@ -212,7 +227,7 @@ namespace Effectio.Effects
                     if (CheckTriggerCondition(entity, active.Effect))
                     {
                         active.HasTriggered = true;
-                        ExecuteAction(entity, active.Effect);
+                        ExecuteAction(entity, active.Effect, active.SourceStatusKey);
                         OnEffectTick?.Invoke(entity, active.Effect);
                     }
                 }
@@ -228,24 +243,26 @@ namespace Effectio.Effects
             return effect.Trigger.IsSatisfied(in ctx);
         }
 
-        private void ExecuteAction(IEffectioEntity entity, IEffect effect)
+        private void ExecuteAction(IEffectioEntity entity, IEffect effect, string sourceStatusKey = null)
         {
             var ctx = new EffectActionContext
             {
                 Entity = entity,
                 Effect = effect,
-                StatusEngine = _statusEngine
+                StatusEngine = _statusEngine,
+                SourceStatusKey = sourceStatusKey
             };
             effect.Action.Execute(in ctx);
         }
 
-        private void UndoAction(IEffectioEntity entity, IEffect effect)
+        private void UndoAction(IEffectioEntity entity, IEffect effect, string sourceStatusKey = null)
         {
             var ctx = new EffectActionContext
             {
                 Entity = entity,
                 Effect = effect,
-                StatusEngine = _statusEngine
+                StatusEngine = _statusEngine,
+                SourceStatusKey = sourceStatusKey
             };
             effect.Action.Undo(in ctx);
         }
@@ -264,6 +281,9 @@ namespace Effectio.Effects
         {
             public IEffect Effect { get; }
             public float RemainingDuration { get; set; }
+
+            /// <summary>Which status applied this, or null for a direct application.</summary>
+            public string SourceStatusKey { get; set; }
             public float TimeSinceLastTick { get; set; }
             public bool PendingTick { get; set; }
             public bool PendingRemoval { get; set; }
