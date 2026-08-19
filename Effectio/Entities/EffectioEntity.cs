@@ -8,6 +8,9 @@ namespace Effectio.Entities
     public class EffectioEntity : IEffectioEntity
     {
         private readonly Dictionary<string, IStat> _stats = new Dictionary<string, IStat>();
+
+        /// <summary>The same stats as a flat array, for the tick loop.</summary>
+        private IStat[] _statArray = System.Array.Empty<IStat>();
         private readonly HashSet<string> _statusKeys = new HashSet<string>();
         private readonly IStatusEngine _stackQueryEngine;
 
@@ -44,6 +47,13 @@ namespace Effectio.Entities
                 throw new InvalidOperationException($"Stat '{stat.Key}' already exists on entity '{Id}'.");
 
             _stats[stat.Key] = stat;
+
+            // Rebuilt here rather than walked from the dictionary every frame. Stats are added
+            // when an entity is built and almost never afterwards, so this pays once for a
+            // flat array to tick - and the array is what makes adding a stat from inside a
+            // tick safe, since a loop already running holds the old one.
+            _statArray = new IStat[_stats.Count];
+            _stats.Values.CopyTo(_statArray, 0);
         }
 
         public IStat GetStat(string key)
@@ -61,11 +71,25 @@ namespace Effectio.Entities
 
         public bool HasStat(string key) => _stats.ContainsKey(key);
 
+        /// <summary>
+        /// Ticks every stat's modifiers. The hottest loop in the library: once per entity,
+        /// every frame.
+        ///
+        /// Over a flat array rather than the dictionary, which is both faster and the reason
+        /// this is safe to re-enter. Ticking a modifier can expire it, which recalculates the
+        /// stat, which raises <see cref="Stats.IStat.OnValueChanged"/> - somebody else's code,
+        /// free to give this entity a stat it did not have. Walking the dictionary, that threw.
+        ///
+        /// The array reference is taken once into a local, so a stat added part way through
+        /// swaps the field without disturbing the loop in flight; the new stat starts on the
+        /// next frame, the same way a newly spawned entity does.
+        /// </summary>
         public void TickStatModifiers(float deltaTime)
         {
-            // Uses Dictionary<K,V>.Enumerator (struct) — no enumerator boxing on the hot path.
-            foreach (var kvp in _stats)
-                kvp.Value.TickModifiers(deltaTime);
+            var stats = _statArray;
+
+            for (int i = 0; i < stats.Length; i++)
+                stats[i].TickModifiers(deltaTime);
         }
 
         public void AddStatus(string statusKey) => _statusKeys.Add(statusKey);

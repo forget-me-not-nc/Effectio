@@ -120,6 +120,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **A tick can now create entities and stats.** Both loops that drive a frame
+  were walking a live collection while running consumer code, and the most
+  ordinary things that code does are to make something or kill something.
+
+  `EffectioManager.Tick` enumerated the entity dictionary directly, so an
+  effect action that spawned - a death that summons, a slime that splits, a
+  tick that calls for help - threw `InvalidOperationException` on the next
+  step. Removal happened to work, because .NET Core permits `Remove` during
+  enumeration and not `Add`, which is worse than either being consistently
+  broken: it teaches you the pattern is safe. Entities are now copied into a
+  reused list before any of their code runs, so the tick stays
+  allocation-free after its first call. An entity removed mid-tick stops being
+  ticked for the rest of that frame, and an id re-registered mid-tick does not
+  tick the object it replaced. A newly created entity starts on the next tick.
+
+  `EffectioEntity.TickStatModifiers` had the same shape one level down: a
+  modifier expiring recalculates its stat, which raises `OnValueChanged`,
+  which is consumer code free to call `AddStat`. Stats are now ticked over a
+  flat array rebuilt on `AddStat` rather than walked from the dictionary -
+  faster on the hottest loop in the library, and a stat added part way through
+  swaps the field without disturbing the loop in flight.
+
 - **`IStatus.OnRemoveEffects` now fire when a status is removed deliberately,
   not only when it expires.** The property has always been documented as
   firing on "manual remove or expiration" and only ever did the second:
