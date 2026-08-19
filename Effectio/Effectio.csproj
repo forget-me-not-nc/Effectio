@@ -14,9 +14,9 @@
 
     <!-- NuGet package identity -->
     <PackageId>Effectio</PackageId>
-    <Version>1.0.0</Version>
-    <AssemblyVersion>1.0.0.0</AssemblyVersion>
-    <FileVersion>1.0.0.0</FileVersion>
+    <Version>1.1.0</Version>
+    <AssemblyVersion>1.1.0.0</AssemblyVersion>
+    <FileVersion>1.1.0.0</FileVersion>
 
     <!-- NuGet package metadata -->
     <Authors>Nazar Paliichuk</Authors>
@@ -30,7 +30,7 @@
     <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>See CHANGELOG.md at the repository root. 1.0.0 is the initial public release: polymorphic modifiers / effect actions / triggers / reaction results, pooled hot-path buffers, 0 B/op Tick at 1000 entities.</PackageReleaseNotes>
+    <PackageReleaseNotes>See CHANGELOG.md at the repository root. 1.1.0 adds stacking semantics (StackDecay, TicksPerStack), remaining-duration queries, the source status on an effect action's context, OnRefresh hooks, an entity stack-count shortcut - and fixes four bugs, two of which crash or silently corrupt state: unbounded BaseValue, OnRemoveEffects never firing on manual removal, and two collections mutated while being enumerated during Tick.</PackageReleaseNotes>
     <Copyright>Copyright (c) 2026 Nazar Paliichuk</Copyright>
 
     <!-- Symbols + source-link for a nicer debugger experience for consumers. -->
