@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **`IEffectioEntity.GetStatusStackCount(string)`** ergonomic shortcut for
+  `manager.Statuses.GetStacks(entity, key)`. The built-in `EffectioEntity`
+  queries through a status-engine reference wired at construction;
+  `EffectioManager.CreateEntity` passes that reference automatically so
+  the shortcut "just works" for the 99% path. Manually-constructed
+  entities using the v1.0 single-arg ctor return 0 (documented fallback);
+  the new 2-arg ctor `EffectioEntity(string id, IStatusEngine engine)`
+  opts in to real stack queries. Roadmap task v1.1 #5.
 - **Stack-aware reactions** via the new `IStackAwareReaction` interface and
   the `ReactionBuilder.RequireStacks(string, int)` and
   `ReactionBuilder.ConsumesStacks(string, int)` fluent methods. Reactions
@@ -58,11 +66,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Backwards compatibility
 
-- v1.0 source and binary surfaces are preserved. `IReaction`, `IEffectsEngine`,
-  `IStatusEngine` and `IEffectioManager` are unchanged, so existing
-  implementations compile and load against v1.1 unmodified. New surfaces
-  (`IPrioritizedReaction`, `IStackAwareReaction`, `IEffectCatalog`,
-  `IStackOperations`, `EffectioManager.EffectCatalog`) are additive.
+- v1.0 source and binary surfaces are preserved at the `IReaction` /
+  `IEffectsEngine` / `IStatusEngine` / `IEffectioManager` level for the
+  v1.0 method shape. `IEffectioEntity` grows ONE new member in v1.1
+  (`GetStatusStackCount`); this is technically a binary break for any
+  external implementation of `IEffectioEntity`. External implementers
+  add the method returning whatever stack source they own (return 0
+  if the implementer doesn't track stacks). The built-in `EffectioEntity`
+  adds it transparently and keeps its single-arg ctor as a delegating
+  overload to a new 2-arg ctor that accepts the status-engine ref.
+  Other new surfaces (`IPrioritizedReaction`, `IStackAwareReaction`,
+  `IEffectCatalog`, `IStackOperations`, `EffectioManager.EffectCatalog`)
+  are pure additions on new opt-in interfaces.
   The v1.0 5-parameter `Reaction(...)` constructor and the v1.1-preview
   6-parameter overload are both kept as distinct ctors (delegating to the
   new 8-parameter form with empty stack arrays / priority 0), so pre-built
