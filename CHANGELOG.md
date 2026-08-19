@@ -16,6 +16,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   entities using the v1.0 single-arg ctor return 0 (documented fallback);
   the new 2-arg ctor `EffectioEntity(string id, IStatusEngine engine)`
   opts in to real stack queries. Roadmap task v1.1 #5.
+- **`IRemainingDuration`** (`Effectio.Common`), implemented by both
+  `StatusEngine` and `EffectsEngine`. `GetRemainingDuration(entity, key)`
+  returns seconds left, `-1` for permanent (matching `IStatus.Duration`'s
+  convention) and `0` for absent - unambiguous, because anything reaching
+  zero is removed in the same tick, so nothing is ever present with none
+  left. Both engines had always counted this and neither would tell anyone:
+  a consumer could learn that a status was present and how many stacks it
+  had, but not how long it would stay, which is the one number a buff timer
+  is made of. The only recourse was to shadow the clock outside the engine,
+  and that copy is wrong the moment anything refreshes a duration - which
+  `ApplyStatus` does as its normal behaviour. Kept as its own interface for
+  the same reason `IStackOperations` is: a v1.0 consumer who implemented
+  `IStatusEngine` or `IEffectsEngine` directly keeps compiling, and asks for
+  this with a type check.
+
 - **`StatusBuilder.OnRefresh(IEffect)`** + **`IStatus.OnRefreshEffects`** +
   **`IStatusEngine.OnStatusRefreshed`** event. Effects fire every time
   `ApplyStatus` is called against an entity that already has the status,

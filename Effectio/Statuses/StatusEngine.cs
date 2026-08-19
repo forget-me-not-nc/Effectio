@@ -1,11 +1,12 @@
 using System;
 using System.Collections.Generic;
 using Effectio.Common.Logging;
+using Effectio.Common;
 using Effectio.Entities;
 
 namespace Effectio.Statuses
 {
-    public class StatusEngine : IStatusEngine, IStackOperations
+    public class StatusEngine : IStatusEngine, IStackOperations, IRemainingDuration
     {
         private readonly IEffectioLogger _logger;
 
@@ -149,6 +150,21 @@ namespace Effectio.Statuses
         public bool HasStatus(IEffectioEntity entity, string statusKey)
         {
             return entity.HasStatus(statusKey);
+        }
+
+        /// <inheritdoc />
+        public float GetRemainingDuration(IEffectioEntity entity, string key)
+        {
+            if (entity != null
+                && _activeStatuses.TryGetValue(entity.Id, out var entityStatuses)
+                && entityStatuses.TryGetValue(key, out var data))
+            {
+                // Negative is the permanent marker and passes through as it is; a live status
+                // always has something left, because Tick removes it the moment it does not.
+                return data.RemainingDuration < 0f ? -1f : data.RemainingDuration;
+            }
+
+            return 0f;
         }
 
         public int GetStacks(IEffectioEntity entity, string statusKey)

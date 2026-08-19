@@ -4,12 +4,13 @@ using System.Linq;
 using Effectio.Common.Logging;
 using Effectio.Effects.Actions;
 using Effectio.Effects.Triggers;
+using Effectio.Common;
 using Effectio.Entities;
 using Effectio.Statuses;
 
 namespace Effectio.Effects
 {
-    public class EffectsEngine : IEffectsEngine, IEffectCatalog
+    public class EffectsEngine : IEffectsEngine, IEffectCatalog, IRemainingDuration
     {
         private readonly IEffectioLogger _logger;
         private readonly IStatusEngine _statusEngine;
@@ -79,6 +80,40 @@ namespace Effectio.Effects
 
             OnEffectApplied?.Invoke(entity, effect);
             if (_logger.IsEnabled) _logger.Info($"Effect '{effect.Key}' applied to entity '{entity.Id}'.");
+        }
+
+        /// <inheritdoc />
+        public float GetRemainingDuration(IEffectioEntity entity, string key)
+        {
+            if (entity == null || !_activeEffects.TryGetValue(entity.Id, out var effects))
+                return 0f;
+
+            for (int i = 0; i < effects.Count; i++)
+            {
+                if (effects[i].Effect.Key != key)
+                    continue;
+
+                // The longest of them, for the same reason a status reports one number: an
+                // interface draws one timer per key, and the honest one is when the key stops
+                // mattering rather than when its first copy runs out.
+                float longest = effects[i].Effect.Duration < 0f ? -1f : effects[i].RemainingDuration;
+
+                for (int j = i + 1; j < effects.Count; j++)
+                {
+                    if (effects[j].Effect.Key != key)
+                        continue;
+
+                    if (effects[j].Effect.Duration < 0f)
+                        return -1f;
+
+                    if (longest >= 0f && effects[j].RemainingDuration > longest)
+                        longest = effects[j].RemainingDuration;
+                }
+
+                return longest;
+            }
+
+            return 0f;
         }
 
         public void RemoveEffect(IEffectioEntity entity, string effectKey)
