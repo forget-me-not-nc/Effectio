@@ -172,6 +172,34 @@ namespace Effectio.Tests.Core
         }
 
         [TestMethod]
+        public void AddingAStatFromInsideAStatChangeDoesNotThrow()
+        {
+            // The same hazard one level down. A modifier expiring recalculates its stat,
+            // which raises OnValueChanged - somebody else's code, free to give the entity a
+            // stat it did not have while the tick loop is walking them.
+            var manager = new EffectioManager();
+            var entity = WithHealth(manager, "changer");
+
+            var health = entity.GetStat("Health");
+
+            health.AddModifier(ModifierBuilder.Create("brief")
+                .Additive(-5f)
+                .WithDuration(1f)
+                .Build());
+
+            health.Recalculate();
+
+            // Subscribed only now, so the one change this handler sees is the one the tick
+            // causes when the modifier expires. Hooked up earlier it would fire on the line
+            // above instead, outside any loop, and prove nothing.
+            health.OnValueChanged += (_, _, _) => entity.AddStat(new Stat("Fury", 0f, 0f, 100f));
+
+            manager.Tick(1.5f);
+
+            Assert.IsTrue(entity.HasStat("Fury"));
+        }
+
+        [TestMethod]
         public void ManySpawnsInOneTick()
         {
             // A crowd arriving at once, which is what an area effect looks like.
