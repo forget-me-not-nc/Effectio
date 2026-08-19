@@ -198,6 +198,12 @@ namespace Effectio.Tests.Statuses
             public IEffect[] OnRemoveEffects => new IEffect[0];
             public IEffect[] OnRefreshEffects => null; // explicit null
             public float TickInterval => 1f;
+
+            // The two v1.1 stacking members, answered the way an external implementer who
+            // wants none of it would: the defaults are the v1.0 behaviour, so saying so
+            // costs two lines and changes nothing.
+            public StackDecay StackDecay => StackDecay.All;
+            public bool TickScalesWithStacks => false;
         }
 
         [TestMethod]

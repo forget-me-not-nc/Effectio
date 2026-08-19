@@ -16,6 +16,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   entities using the v1.0 single-arg ctor return 0 (documented fallback);
   the new 2-arg ctor `EffectioEntity(string id, IStatusEngine engine)`
   opts in to real stack queries. Roadmap task v1.1 #5.
+- **Stacking semantics: `StackDecay` and `TicksPerStack`.** The two questions
+  a stacked status has to answer, and until now it answered both by accident.
+
+  `IStatus.StackDecay` chooses how the stacks go when the timer runs out.
+  `StackDecay.All` is v1.0 behaviour and the default - one timer, everything
+  ends together. `StackDecay.One` (`StatusBuilder.DecayOneAtATime()`) drops a
+  single stack and winds the timer back up, removing the status when the last
+  one goes. The difference is what stacking feels like: `All` makes stacks a
+  state you hold, where five and one end at the same moment and the climb to
+  five bought nothing lasting; `One` makes them pressure that drains, hard to
+  build and slow to lose. Still one timer, not one per stack - per-stack
+  expiry differs only when stacks arrived at uneven intervals, costs storage
+  per stack, and turns "how long is this left" into a question with several
+  answers. It remains a v2 candidate.
+
+  `IStatus.TickScalesWithStacks` (`StatusBuilder.TicksPerStack()`) fires
+  `OnTickEffects` once per stack instead of once per tick, so three stacks of
+  a bleed cost three times as much. Repetition rather than multiplication: an
+  effect's action is arbitrary, so a value can be scaled but "apply that
+  status" cannot, and the engine cannot tell which it holds. All-or-nothing
+  per status rather than per effect - a status wanting half its ticks scaled
+  is describing two statuses. Roadmap task v1.1 #9.
+
+  A status that loses a stack to decay still ticks that second: it lost a
+  stack, it did not end, and skipping the tick would be a hole in the numbers
+  nobody could see. One stack per `Tick` call whatever the delta, matching the
+  one-expiry-per-call rule the engine already follows everywhere else.
+
 - **`IRemainingDuration`** (`Effectio.Common`), implemented by both
   `StatusEngine` and `EffectsEngine`. `GetRemainingDuration(entity, key)`
   returns seconds left, `-1` for permanent (matching `IStatus.Duration`'s
@@ -122,9 +150,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - `IStatusEngine.OnStatusRefreshed` - engine plumbing rather than
     user-extension surface, so the realistic population of external
     implementers is zero.
-  - `IStatus.OnRefreshEffects` - external implementations add the property;
-    `null` or `Array.Empty` is fine, the manager null-guards. The built-in
-    `Status` keeps its v1.0 8-parameter ctor as a delegating overload.
+  - `IStatus.OnRefreshEffects`, `IStatus.StackDecay` and
+    `IStatus.TickScalesWithStacks` - external implementations add the three;
+    `null` / `StackDecay.All` / `false` reproduce v1.0 behaviour exactly, so
+    saying so costs three lines and changes nothing. `OnRefreshEffects` may be
+    `null` or `Array.Empty`, the manager null-guards. The built-in `Status`
+    keeps its v1.0 8-parameter ctor as a delegating overload, and its v1.1
+    9-parameter one as another.
   Other new surfaces (`IPrioritizedReaction`, `IStackAwareReaction`,
   `IEffectCatalog`, `IStackOperations`, `EffectioManager.EffectCatalog`)
   are pure additions on new opt-in interfaces.

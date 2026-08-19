@@ -141,13 +141,35 @@ namespace Effectio.Core
                     var definition = _statusEngine.GetStatusDefinition(statusKey);
                     if (definition?.OnTickEffects != null)
                     {
-                        foreach (var effect in definition.OnTickEffects)
+                        // Repetition rather than multiplication. An effect's action is
+                        // arbitrary - a number can be scaled, "apply that status" cannot -
+                        // so the only meaning available in general is that a status with
+                        // three stacks ticks as if it had ticked three times at once.
+                        var times = definition.TickScalesWithStacks
+                            ? _statusEngine.GetStacks(entity, statusKey)
+                            : 1;
+
+                        for (var repeat = 0; repeat < times; repeat++)
                         {
-                            _effectsEngine.ApplyEffect(entity, effect);
+                            foreach (var effect in definition.OnTickEffects)
+                            {
+                                _effectsEngine.ApplyEffect(entity, effect);
+                            }
                         }
                     }
                 }
             }
+
+            // 4a. Announce stacks lost to decay. Before expirations, so a listener sees the
+            //     counter fall one at a time and only then sees the status go.
+            for (int i = 0; i < _statusEngine.PendingDecays.Count; i++)
+            {
+                var (entityId, statusKey) = _statusEngine.PendingDecays[i];
+                if (_entities.TryGetValue(entityId, out var decayed))
+                    _statusEngine.RaiseDecayed(decayed, statusKey);
+            }
+
+            _statusEngine.PendingDecays.Clear();
 
             // 4. Process status expirations
             foreach (var (entityId, statusKey) in _statusEngine.PendingExpirations)

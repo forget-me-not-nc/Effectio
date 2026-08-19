@@ -18,6 +18,8 @@ namespace Effectio.Builders
         private readonly List<IEffect> _onTick = new List<IEffect>();
         private readonly List<IEffect> _onRemove = new List<IEffect>();
         private readonly List<IEffect> _onRefresh = new List<IEffect>();
+        private Statuses.StackDecay _stackDecay = Statuses.StackDecay.All;
+        private bool _tickScalesWithStacks;
 
         public StatusBuilder(string key)
         {
@@ -37,6 +39,18 @@ namespace Effectio.Builders
         public StatusBuilder WithDuration(float duration) { _duration = duration; return this; }
         public StatusBuilder Permanent() { _duration = -1f; return this; }
         public StatusBuilder Stackable(int maxStacks) { _maxStacks = maxStacks; return this; }
+
+        /// <summary>
+        /// Lose one stack when the timer runs out, and start it again, instead of losing the
+        /// whole status at once. See <see cref="StackDecay"/> for what the two feel like.
+        /// </summary>
+        public StatusBuilder DecayOneAtATime() { _stackDecay = Statuses.StackDecay.One; return this; }
+
+        /// <summary>
+        /// Fire <c>OnTick</c> effects once per stack rather than once per tick, so three
+        /// stacks of a bleed cost three times as much.
+        /// </summary>
+        public StatusBuilder TicksPerStack() { _tickScalesWithStacks = true; return this; }
         public StatusBuilder WithTickInterval(float interval) { _tickInterval = interval; return this; }
 
         public StatusBuilder OnApply(IEffect effect) { _onApply.Add(effect); return this; }
@@ -69,6 +83,8 @@ namespace Effectio.Builders
             _onTick.ToArray(),
             _onRemove.ToArray(),
             _tickInterval,
-            _onRefresh.Count > 0 ? _onRefresh.ToArray() : null);
+            _onRefresh.Count > 0 ? _onRefresh.ToArray() : null,
+            _stackDecay,
+            _tickScalesWithStacks);
     }
 }

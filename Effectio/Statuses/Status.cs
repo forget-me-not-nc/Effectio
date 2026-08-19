@@ -13,6 +13,8 @@ namespace Effectio.Statuses
         public IEffect[] OnRemoveEffects { get; }
         public IEffect[] OnRefreshEffects { get; }
         public float TickInterval { get; }
+        public StackDecay StackDecay { get; }
+        public bool TickScalesWithStacks { get; }
 
         /// <summary>
         /// v1.0 / early-v1.1 constructor (no <c>OnRefreshEffects</c>). Kept as a distinct
@@ -45,7 +47,28 @@ namespace Effectio.Statuses
             IEffect[] onRemoveEffects,
             float tickInterval,
             IEffect[] onRefreshEffects)
+            : this(key, tags, duration, maxStacks, onApplyEffects, onTickEffects,
+                   onRemoveEffects, tickInterval, onRefreshEffects,
+                   StackDecay.All, tickScalesWithStacks: false)
         {
+        }
+
+        /// <summary>v1.1 constructor adding the stacking semantics.</summary>
+        public Status(
+            string key,
+            string[] tags,
+            float duration,
+            int maxStacks,
+            IEffect[] onApplyEffects,
+            IEffect[] onTickEffects,
+            IEffect[] onRemoveEffects,
+            float tickInterval,
+            IEffect[] onRefreshEffects,
+            StackDecay stackDecay,
+            bool tickScalesWithStacks)
+        {
+            StackDecay = stackDecay;
+            TickScalesWithStacks = tickScalesWithStacks;
             Key = key;
             Tags = tags ?? new string[0];
             Duration = duration;

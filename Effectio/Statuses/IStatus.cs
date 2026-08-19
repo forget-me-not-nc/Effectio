@@ -67,6 +67,34 @@ namespace Effectio.Statuses
 
         /// <summary>Seconds between successive <see cref="OnTickEffects"/> applications.</summary>
         float TickInterval { get; }
+
+        /// <summary>
+        /// What happens to the stacks when <see cref="Duration"/> runs out. See
+        /// <see cref="Statuses.StackDecay"/> for what the choice means; defaults to
+        /// <see cref="Statuses.StackDecay.All"/>, which is the v1.0 behaviour.
+        /// </summary>
+        StackDecay StackDecay { get; }
+
+        /// <summary>
+        /// Whether <see cref="OnTickEffects"/> fire once per stack instead of once per tick.
+        ///
+        /// The reason to have stacks at all. Three stacks of a bleed that tick for the same
+        /// one point as a single stack are three of nothing: the number goes up and the
+        /// damage does not, and the player learns that stacking is decoration.
+        ///
+        /// Scaling is repetition rather than multiplication - the effects run <c>n</c> times,
+        /// exactly as if the status had ticked <c>n</c> times in one instant. That is the only
+        /// meaning available in general, because an effect's action is arbitrary: a value can
+        /// be multiplied, but "apply this status" and "remove that modifier" cannot, and the
+        /// engine has no way to tell which it is holding. Anything needing a different shape
+        /// writes an <see cref="Effectio.Effects.Actions.IEffectAction"/> that reads the stack
+        /// count itself.
+        ///
+        /// All-or-nothing per status rather than per effect. A status whose ticks scale is a
+        /// status; one that wants half its ticks scaled and half not is describing two
+        /// statuses, or one custom action.
+        /// </summary>
+        bool TickScalesWithStacks { get; }
     }
 }
 

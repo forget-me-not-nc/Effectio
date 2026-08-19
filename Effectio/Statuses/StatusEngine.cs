@@ -201,8 +201,9 @@ namespace Effectio.Statuses
 
         public void Tick(float deltaTime)
         {
-            // Reuse the pooled buffer so Tick is allocation-free.
+            // Reuse the pooled buffers so Tick is allocation-free.
             _expiredBuffer.Clear();
+            _decayedBuffer.Clear();
 
             foreach (var kvp in _activeStatuses)
             {
@@ -218,8 +219,34 @@ namespace Effectio.Statuses
                         data.RemainingDuration -= deltaTime;
                         if (data.RemainingDuration <= 0)
                         {
-                            _expiredBuffer.Add((entityId, data.StatusKey));
-                            continue;
+                            // One stack at a time: drop a stack, wind the timer back up, and
+                            // only expire once the last one has gone. Everything else about
+                            // the status carries on - the point of this mode is that the
+                            // status persists while it drains.
+                            if (definition != null
+                                && definition.StackDecay == StackDecay.One
+                                && data.Stacks > 1)
+                            {
+                                data.Stacks--;
+                                data.RemainingDuration = definition.Duration;
+                                _decayedBuffer.Add((entityId, data.StatusKey));
+
+                                // Falls through to the tick block rather than skipping it.
+                                // The status is still on the entity this instant - it lost a
+                                // stack, it did not end - and a bleed that quietly missed a
+                                // second every time the pile dropped would be a hole nobody
+                                // could see in the numbers.
+                                //
+                                // One stack per Tick call, whatever the delta. The engine
+                                // raises one expiry event per call everywhere else, and a
+                                // decay that drained several stacks out of one long frame
+                                // while a plain expiry drained one would be two rules.
+                            }
+                            else
+                            {
+                                _expiredBuffer.Add((entityId, data.StatusKey));
+                                continue;
+                            }
                         }
                     }
 
@@ -251,8 +278,32 @@ namespace Effectio.Statuses
         /// </summary>
         internal List<(string entityId, string statusKey)> PendingExpirations => _expiredBuffer;
 
+        /// <summary>
+        /// Statuses that lost a single stack this Tick under
+        /// <see cref="StackDecay.One"/> and are still active. Kept apart from
+        /// <see cref="PendingExpirations"/> because they are the opposite event: the status
+        /// survived. The manager turns these into <see cref="IStackOperations.OnStatusStacked"/>.
+        /// </summary>
+        internal List<(string entityId, string statusKey)> PendingDecays => _decayedBuffer;
+
         private readonly List<(string entityId, string statusKey)> _expiredBuffer
             = new List<(string, string)>();
+
+        private readonly List<(string entityId, string statusKey)> _decayedBuffer
+            = new List<(string, string)>();
+
+        /// <summary>
+        /// Announces a stack lost to decay. Called by the manager after its own tick loop, not
+        /// from inside one: a handler is free to apply or remove statuses, and doing that while
+        /// the active map is being walked would throw.
+        /// </summary>
+        internal void RaiseDecayed(IEffectioEntity entity, string statusKey)
+        {
+            if (_logger.IsEnabled)
+                _logger.Info($"Status '{statusKey}' on entity '{entity.Id}' decayed by one stack.");
+
+            OnStatusStacked?.Invoke(entity, statusKey);
+        }
 
         /// <summary>
         /// Get pending tick data for a specific entity. The returned list is a reused buffer —
