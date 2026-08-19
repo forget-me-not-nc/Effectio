@@ -16,6 +16,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   entities using the v1.0 single-arg ctor return 0 (documented fallback);
   the new 2-arg ctor `EffectioEntity(string id, IStatusEngine engine)`
   opts in to real stack queries. Roadmap task v1.1 #5.
+- **`StatusBuilder.OnRefresh(IEffect)`** + **`IStatus.OnRefreshEffects`** +
+  **`IStatusEngine.OnStatusRefreshed`** event. Effects fire every time
+  `ApplyStatus` is called against an entity that already has the status,
+  whether the stack counter increments or is already at `MaxStacks`.
+  Distinct from `IStackOperations.OnStatusStacked` (which fires only on
+  counter changes); `OnStatusRefreshed` fires on both stack-increment AND
+  at-max refresh paths because the combined `RemainingDuration` refreshes
+  in both. Does NOT fire on first application or on `RemoveStacks` partial
+  decrement. Useful for "stand-in-flame" patterns where each re-application
+  bursts damage. Roadmap task v1.1 #7.
 - **Stack-aware reactions** via the new `IStackAwareReaction` interface and
   the `ReactionBuilder.RequireStacks(string, int)` and
   `ReactionBuilder.ConsumesStacks(string, int)` fluent methods. Reactions
@@ -67,14 +77,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Backwards compatibility
 
 - v1.0 source and binary surfaces are preserved at the `IReaction` /
-  `IEffectsEngine` / `IStatusEngine` / `IEffectioManager` level for the
-  v1.0 method shape. `IEffectioEntity` grows ONE new member in v1.1
-  (`GetStatusStackCount`); this is technically a binary break for any
-  external implementation of `IEffectioEntity`. External implementers
-  add the method returning whatever stack source they own (return 0
-  if the implementer doesn't track stacks). The built-in `EffectioEntity`
-  adds it transparently and keeps its single-arg ctor as a delegating
-  overload to a new 2-arg ctor that accepts the status-engine ref.
+  `IEffectsEngine` / `IEffectioManager` level for the v1.0 method shapes.
+  Three interfaces do grow a member in v1.1, which is technically a binary
+  break for anyone who implemented them externally:
+
+  - `IEffectioEntity.GetStatusStackCount(string)` - external implementers
+    return whatever stack source they own, or 0 if they track none. The
+    built-in `EffectioEntity` adds it transparently and keeps its single-arg
+    ctor as a delegating overload to a new 2-arg ctor taking the status
+    engine.
+  - `IStatusEngine.OnStatusRefreshed` - engine plumbing rather than
+    user-extension surface, so the realistic population of external
+    implementers is zero.
+  - `IStatus.OnRefreshEffects` - external implementations add the property;
+    `null` or `Array.Empty` is fine, the manager null-guards. The built-in
+    `Status` keeps its v1.0 8-parameter ctor as a delegating overload.
   Other new surfaces (`IPrioritizedReaction`, `IStackAwareReaction`,
   `IEffectCatalog`, `IStackOperations`, `EffectioManager.EffectCatalog`)
   are pure additions on new opt-in interfaces.

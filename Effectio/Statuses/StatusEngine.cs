@@ -33,6 +33,12 @@ namespace Effectio.Statuses
         // IStackOperations.OnStatusStacked.
         public event Action<IEffectioEntity, string> OnStatusStacked;
 
+        // v1.1: fires every time ApplyStatus is called against an entity that
+        // already has the status. RemainingDuration is refreshed first; then
+        // this fires. Distinct from OnStatusStacked: OnStatusRefreshed fires for
+        // both the stack-increment path AND the at-MaxStacks refresh-only path.
+        public event Action<IEffectioEntity, string> OnStatusRefreshed;
+
         public StatusEngine(IEffectioLogger logger = null)
         {
             _logger = logger ?? VoidLogger.Instance;
@@ -107,6 +113,8 @@ namespace Effectio.Statuses
                 }
                 // Refresh duration
                 existing.RemainingDuration = definition.Duration;
+                // v1.1: notify refresh listeners (fires for both stack-increment and at-max paths).
+                OnStatusRefreshed?.Invoke(entity, statusKey);
                 return;
             }
 
