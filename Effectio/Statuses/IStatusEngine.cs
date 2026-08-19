@@ -26,6 +26,13 @@ namespace Effectio.Statuses
         void RemoveStatus(IEffectioEntity entity, string statusKey);
         bool HasStatus(IEffectioEntity entity, string statusKey);
         int GetStacks(IEffectioEntity entity, string statusKey);
+        /// <summary>
+        /// The registered definition for <paramref name="statusKey"/>, or <c>null</c> when
+        /// none was registered. Returns null rather than throwing, unlike
+        /// <see cref="Core.IEffectioManager.GetEntity"/> and
+        /// <see cref="Entities.IEffectioEntity.GetStat"/> - a status key naming nothing is an
+        /// ordinary state while content is being written, not a programming error.
+        /// </summary>
         IStatus GetStatusDefinition(string statusKey);
         void Tick(float deltaTime);
 

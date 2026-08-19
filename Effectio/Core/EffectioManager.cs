@@ -13,6 +13,21 @@ namespace Effectio.Core
         private readonly IEffectioLogger _logger;
         private readonly Dictionary<string, IEffectioEntity> _entities = new Dictionary<string, IEffectioEntity>();
 
+        /// <summary>
+        /// The entities being ticked this frame, copied out of the dictionary before any of
+        /// their code runs.
+        ///
+        /// Ticking straight off the dictionary meant a game could not spawn anything from
+        /// inside an effect. A death that summons, a slime that splits, a tick that calls for
+        /// help - each of them adds an entity while the loop that provoked it is still
+        /// walking, and .NET throws on the next step. Not a wrong number: a hard crash, in
+        /// content that is entirely reasonable to write.
+        ///
+        /// Reused rather than allocated, so the tick stays allocation-free once it has run
+        /// once - the list keeps its capacity and only its contents change.
+        /// </summary>
+        private readonly List<IEffectioEntity> _tickBuffer = new List<IEffectioEntity>();
+
         private readonly StatusEngine _statusEngine;
         private readonly EffectsEngine _effectsEngine;
         private readonly ReactionEngine _reactionEngine;
@@ -130,10 +145,27 @@ namespace Effectio.Core
             // 2. Tick statuses (decrement durations, mark tick effects)
             _statusEngine.Tick(deltaTime);
 
-            // 3. Process pending operations that require entity references
+            // 3. Process pending operations that require entity references.
+            //
+            // Over a copy, because everything below runs somebody else's code: effect
+            // actions, status ticks, reaction results. Anything of that could create an
+            // entity, and a dictionary being enumerated will not have it.
+            _tickBuffer.Clear();
+
             foreach (var kvp in _entities)
             {
-                var entity = kvp.Value;
+                _tickBuffer.Add(kvp.Value);
+            }
+
+            for (int i = 0; i < _tickBuffer.Count; i++)
+            {
+                var entity = _tickBuffer[i];
+
+                // Skipped if it has since been taken out of the world, or replaced by another
+                // entity registered under the same id. Something killed early in a tick must
+                // not keep being ticked for the rest of it.
+                if (!_entities.TryGetValue(entity.Id, out var current) || !ReferenceEquals(current, entity))
+                    continue;
 
                 // Tick modifiers on all stats (no enumerator boxing; uses the entity's struct iterator)
                 entity.TickStatModifiers(deltaTime);
