@@ -469,6 +469,46 @@ Reactions can chain: if a reaction applies a new status that satisfies another r
 
 Custom reaction outcomes: implement `IReactionResult` and pass it via `ReactionBuilder.WithResult(...)`.
 
+### Which reaction wins
+
+When two reactions are both satisfied at once, the one with the higher
+`Priority` fires first, and the statuses it consumes are gone before the
+others are re-checked. That is how a specific reaction preempts the general
+one it overlaps with:
+
+```csharp
+// Five conditions. Should win whenever it can.
+var apocalypse = ReactionBuilder.Create("Apocalypse")
+    .RequireStatuses("Burning", "Wet", "Shocked", "Frozen", "Cursed")
+    .Priority(100)
+    .ConsumesStatuses()
+    .AdjustStat("Health", -500f)
+    .Build();
+
+// Two of the same five. Would otherwise eat the pair Apocalypse needed.
+var vaporize = ReactionBuilder.Create("Vaporize")
+    .RequireStatuses("Burning", "Wet")
+    .Priority(10)
+    .ConsumesStatuses()
+    .AdjustStat("Health", -50f)
+    .Build();
+```
+
+**Reactions that share a priority fire together, in registration order.** That
+is the rule worth knowing before it bites: without `Priority`, every reaction
+sits at 0, and the five-condition Apocalypse only ever fires if it was
+registered *before* the two-condition subsets that would otherwise consume
+`Burning` and `Wet` first. Registration order deciding your combat design is
+the kind of bug that reproduces on one machine and not another as soon as
+content loading stops being alphabetical.
+
+Give overlapping reactions explicit priorities. The rule of thumb: **more
+conditions means higher priority**, because a reaction requiring five statuses
+is by definition the more specific description of the same moment.
+
+Priority is opt-in - a reaction that does not set one is priority 0 and behaves
+exactly as it did in v1.0.
+
 ---
 
 ## Triggers

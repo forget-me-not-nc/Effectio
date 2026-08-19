@@ -26,13 +26,15 @@ namespace Effectio.Statuses
         /// have the status, this is a no-op.
         /// </summary>
         /// <remarks>
-        /// v1.1 semantics: operates on the combined stack counter held by
-        /// <see cref="StatusEngine"/>. If a future release distinguishes
-        /// individual stacks (each with its own expiration), the default
-        /// refinement will be "remove the <paramref name="count"/> oldest stacks".
-        /// Partial decrements do NOT fire <see cref="IStatusEngine.OnStatusRemoved"/>;
-        /// only the full-removal transition does. They DO fire
-        /// <see cref="OnStatusStacked"/> so consumers can react to the count change.
+        /// Operates on the combined stack counter - see <see cref="IStatus.Duration"/> for
+        /// the stack-expiration contract this is part of, including the fact that decrementing
+        /// leaves the duration alone.
+        ///
+        /// What is particular to this method: a partial decrement fires
+        /// <see cref="OnStatusStacked"/> and <em>not</em>
+        /// <see cref="IStatusEngine.OnStatusRemoved"/>; only removing the last stack does the
+        /// latter. Should a future release give each stack its own expiry, this will come to
+        /// mean "remove the <paramref name="count"/> oldest".
         /// </remarks>
         void RemoveStacks(IEffectioEntity entity, string statusKey, int count);
 

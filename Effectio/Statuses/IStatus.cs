@@ -15,17 +15,30 @@ namespace Effectio.Statuses
         /// the status never expires regardless of stack count.
         /// </summary>
         /// <remarks>
-        /// <b>v1.x stack-expiration contract:</b> all stacks of a status share
-        /// one combined <c>RemainingDuration</c>. Each successful
-        /// <see cref="IStatusEngine.ApplyStatus"/> resets that counter to
-        /// <see cref="Duration"/>; <see cref="IStatusEngine.Tick"/> decrements it
-        /// uniformly; when it reaches zero the entire status is removed and
-        /// <see cref="IStatusEngine.OnStatusExpired"/> fires <em>once</em>
-        /// (not once per stack). <see cref="IStackOperations.RemoveStacks"/>
-        /// does NOT touch the duration; remaining stacks keep the in-flight
-        /// value. A future v2 release may distinguish individual stacks
-        /// (each with its own expiration); the v1.x combined-counter
-        /// behaviour will remain selectable / opt-in.
+        /// <b>The v1.x stack-expiration contract, stated once.</b> Everything else that
+        /// touches stacks points here rather than restating it, so there is one description
+        /// to keep true.
+        ///
+        /// <list type="number">
+        /// <item><description>All stacks share <em>one</em> combined remaining duration.
+        /// There is no per-stack timer.</description></item>
+        /// <item><description>Every successful <see cref="IStatusEngine.ApplyStatus"/> resets
+        /// that counter to <see cref="Duration"/> - including calls made at
+        /// <see cref="MaxStacks"/>, which refresh the timer without changing the
+        /// count.</description></item>
+        /// <item><description><see cref="IStatusEngine.Tick"/> decrements it uniformly, one
+        /// expiry event per call whatever the delta.</description></item>
+        /// <item><description>What happens when it reaches zero is
+        /// <see cref="StackDecay"/>'s to say: under <see cref="Statuses.StackDecay.All"/> the
+        /// whole status is removed and <see cref="IStatusEngine.OnStatusExpired"/> fires
+        /// <em>once</em>, not once per stack; under <see cref="Statuses.StackDecay.One"/> a
+        /// single stack is dropped, the counter is reset, and the status survives until the
+        /// last one goes.</description></item>
+        /// <item><description><see cref="IStackOperations.RemoveStacks"/> never touches the
+        /// duration. Remaining stacks keep whatever was left.</description></item>
+        /// </list>
+        ///
+        /// A future v2 may give each stack its own expiry; this behaviour stays selectable.
         /// </remarks>
         float Duration { get; }
 
