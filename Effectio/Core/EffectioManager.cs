@@ -41,6 +41,13 @@ namespace Effectio.Core
             // Wire up: when a status is applied, check reactions
             _statusEngine.OnStatusApplied += OnStatusApplied;
 
+            // v1.1: and when one is taken off. IStatus.OnRemoveEffects has always been
+            // documented as firing on "manual remove or expiration" and only ever fired on
+            // expiration, because nothing was listening here. A status dispelled rather than
+            // waited out silently skipped its own farewell - so anything an author put there
+            // to clean up after itself simply did not happen.
+            _statusEngine.OnStatusRemoved += OnStatusRemoved;
+
             // v1.1: stack count changes also trigger reaction checks so
             // IStackAwareReaction.RequiredStacks thresholds re-evaluate as
             // stacks accumulate. Does NOT replay OnApplyEffects (those fire
@@ -153,7 +160,7 @@ namespace Effectio.Core
                         {
                             foreach (var effect in definition.OnTickEffects)
                             {
-                                _effectsEngine.ApplyEffect(entity, effect);
+                                _effectsEngine.ApplyEffect(entity, effect, statusKey);
                             }
                         }
                     }
@@ -184,7 +191,7 @@ namespace Effectio.Core
                     {
                         foreach (var effect in definition.OnRemoveEffects)
                         {
-                            _effectsEngine.ApplyEffect(entity, effect);
+                            _effectsEngine.ApplyEffect(entity, effect, statusKey);
                         }
                     }
 
@@ -192,6 +199,26 @@ namespace Effectio.Core
                 }
             }
             _statusEngine.PendingExpirations.Clear();
+        }
+
+        /// <summary>
+        /// Fires a status's OnRemoveEffects when it is taken off deliberately.
+        ///
+        /// Expiration does not come through here - the engine raises OnStatusExpired for that
+        /// and the tick loop fires the same effects itself - so there is no path on which both
+        /// run.
+        /// </summary>
+        private void OnStatusRemoved(IEffectioEntity entity, string statusKey)
+        {
+            var definition = _statusEngine.GetStatusDefinition(statusKey);
+
+            if (definition?.OnRemoveEffects == null)
+                return;
+
+            foreach (var effect in definition.OnRemoveEffects)
+            {
+                _effectsEngine.ApplyEffect(entity, effect, statusKey);
+            }
         }
 
         private void OnStatusApplied(IEffectioEntity entity, string statusKey)
@@ -202,7 +229,7 @@ namespace Effectio.Core
             {
                 foreach (var effect in definition.OnApplyEffects)
                 {
-                    _effectsEngine.ApplyEffect(entity, effect);
+                    _effectsEngine.ApplyEffect(entity, effect, statusKey);
                 }
             }
 
@@ -228,7 +255,7 @@ namespace Effectio.Core
             {
                 foreach (var effect in definition.OnRefreshEffects)
                 {
-                    _effectsEngine.ApplyEffect(entity, effect);
+                    _effectsEngine.ApplyEffect(entity, effect, statusKey);
                 }
             }
             // No reaction re-check here. OnStatusStacked already triggers CheckReactions
