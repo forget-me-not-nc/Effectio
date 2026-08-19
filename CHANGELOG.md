@@ -66,6 +66,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **`IStat.BaseValue` is now held inside the stat's own `Min` / `Max`.**
+  Previously only `CurrentValue` was clamped, so a base driven past a limit
+  kept going: forty ticks of `AdjustStat("Health", -5)` on a stat floored at
+  zero left `BaseValue` at `-100` while `CurrentValue` sat correctly at `0`.
+  Nothing looked wrong at that moment - but the next heal had a hundred
+  points of invisible debt to clear before anything moved, so a player could
+  heal for fifty and see no change. The mirror case applied at the ceiling:
+  repeated overheal banked surplus that later damage silently spent.
+
+  `BaseValue`, `Min` and `Max` are now backed fields; assigning any of them
+  re-clamps the base, and the constructor assigns the bounds before the base
+  so it is clamped against the right pair. Bounded by the stat's own limits
+  and not by the effective ones a modifier computes - raising a ceiling is
+  what `CapAdjustmentModifier` is for, and a temporary floor must not
+  permanently heal what it was protecting. Locked with
+  `BaseValueBoundsTests` (7 cases, including the failure by the route a game
+  actually takes: a periodic effect through `EffectioManager`).
+
 - `ReactionBuilder.ApplyEffect(string)` (and `ReactionResult` of type
   `ApplyEffect`) now actually apply the named effect when the reaction
   fires. Pre-v1.1 the reaction engine's `OnApplyEffect` callback was never
